@@ -35,12 +35,15 @@ jobs:
       - name: Build debug APK
         working-directory: android-clean
         shell: bash
-        run: |
-          if ! gradle :app:assembleDebug --stacktrace --no-daemon > build.log 2>&1; then
-            tail -n 220 build.log
-            exit 1
-          fi
-          tail -n 40 build.log
+        run: gradle :app:assembleDebug --stacktrace --no-daemon > build.log 2>&1
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build-log
+          path: android-clean/build.log
+          if-no-files-found: warn
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
