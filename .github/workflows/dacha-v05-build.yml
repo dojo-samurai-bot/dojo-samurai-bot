@@ -35,6 +35,18 @@ jobs:
             v05-source/part-06 \
             v05-source/part-07 \
             > dacha-v05.tar.xz.b64
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('dacha-v05.tar.xz.b64')
+          data = path.read_text()
+          assert len(data) == 59015, len(data)
+          assert data[23876] == 'a', data[23870:23885]
+          data = data[:23876] + 'e' + data[23877:]
+          assert data[26688:26706] == 'ZcFQyBK5fik33K9Z9A', data[26688:26706]
+          data = data[:26696] + 'i' + data[26696:]
+          assert len(data) == 59016
+          path.write_text(data)
+          PY
           wc -c dacha-v05.tar.xz.b64 | tee v05-source-total-size.txt
           base64 --decode dacha-v05.tar.xz.b64 > dacha-v05.tar.xz
           sha256sum dacha-v05.tar.xz | tee v05-source-archive-sha.txt
