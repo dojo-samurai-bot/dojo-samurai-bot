@@ -43,7 +43,10 @@ jobs:
             echo '=== chunks ==='
             wc -c v040-chunks/part-*
             sha256sum v040-chunks/part-*
-            cat v040-chunks/part-* > dacha-v040.zip.b64
+            : > dacha-v040.zip.b64
+            for f in v040-chunks/part-*; do
+              tr -d '[:space:]' < "$f" >> dacha-v040.zip.b64
+            done
             echo '=== combined ==='
             wc -c dacha-v040.zip.b64
             sha256sum dacha-v040.zip.b64
