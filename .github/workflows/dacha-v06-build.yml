@@ -1,0 +1,148 @@
+name: Build Dacha Fibonacci v0.6
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          show-progress: false
+
+      - name: Reconstruct and verify source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat \
+            v06-source/part-00 \
+            v06-source/part-01 \
+            v06-source/part-02 \
+            v06-source/part-03 \
+            v06-source/part-04 \
+            v06-source/part-05 \
+            v06-source/part-06 \
+            v06-source/part-07 \
+            > dacha-v06.tar.xz.b64
+          test "$(wc -c < dacha-v06.tar.xz.b64)" -eq 67580
+          base64 --decode dacha-v06.tar.xz.b64 > dacha-v06.tar.xz
+          echo "a586f21d570f016ff7bde0f2aa373415d215684dc90b2a8178f8fcddbbc81b31  dacha-v06.tar.xz" | sha256sum -c -
+          tar -tJf dacha-v06.tar.xz
+          tar -xJf dacha-v06.tar.xz
+
+          test -f project/app/src/main/assets/www/app.js
+          test -f project/app/src/main/java/ru/dachafibonacci/manager/DachaTodayWidgetService.java
+          test -f project/app/src/main/java/ru/dachafibonacci/manager/NotificationScheduler.java
+          test -f project/app/src/main/java/ru/dachafibonacci/manager/NotificationReceiver.java
+          test -f project/app/src/main/java/ru/dachafibonacci/manager/BootReceiver.java
+          test -f project/app/src/main/res/layout/dacha_today_widget.xml
+          test -f project/app/src/main/res/layout/dacha_today_widget_row.xml
+
+          node --check project/app/src/main/assets/www/app.js
+          python3 - <<'PY'
+          import pathlib
+          import xml.etree.ElementTree as ET
+          root = pathlib.Path('project/app/src/main')
+          for path in root.rglob('*.xml'):
+              ET.parse(path)
+              print('XML OK:', path)
+          PY
+
+          grep -q 'value="micro"' project/app/src/main/assets/www/index.html
+          grep -q 'data-ui-scale="micro"' project/app/src/main/assets/www/styles.css
+          grep -q 'syncPollTimer' project/app/src/main/assets/www/app.js
+          grep -q '<ListView' project/app/src/main/res/layout/dacha_today_widget.xml
+          grep -q 'setRemoteAdapter' project/app/src/main/java/ru/dachafibonacci/manager/DachaTodayWidgetProvider.java
+          grep -q 'POST_NOTIFICATIONS' project/app/src/main/AndroidManifest.xml
+          grep -q 'DachaTodayWidgetService' project/app/src/main/AndroidManifest.xml
+          grep -q "versionName '0.6.0-beta'" project/app/build.gradle
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses >/dev/null || true
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+
+      - name: Build debug and unsigned release APKs
+        working-directory: project
+        shell: bash
+        run: gradle :app:assembleDebug :app:assembleRelease --stacktrace --no-daemon
+
+      - name: Validate APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEBUG_APK="project/app/build/outputs/apk/debug/app-debug.apk"
+          RELEASE_APK="project/app/build/outputs/apk/release/app-release-unsigned.apk"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+
+          test -s "$DEBUG_APK"
+          test -s "$RELEASE_APK"
+          "$APKSIGNER" verify --verbose --print-certs "$DEBUG_APK" > v06-debug-signature.txt
+          "$AAPT" dump badging "$DEBUG_APK" > v06-badging.txt
+          "$AAPT" dump xmltree "$DEBUG_APK" AndroidManifest.xml > v06-manifest-tree.txt
+          unzip -l "$DEBUG_APK" > v06-apk-listing.txt
+          unzip -p "$DEBUG_APK" classes.dex | strings > v06-dex-strings.txt
+
+          grep -q "package: name='ru.dachafibonacci.manager'" v06-badging.txt
+          grep -q "versionName='0.6.0-beta'" v06-badging.txt
+          grep -q 'assets/www/index.html' v06-apk-listing.txt
+          grep -q 'assets/www/app.js' v06-apk-listing.txt
+          grep -q 'assets/www/db.js' v06-apk-listing.txt
+          grep -q 'DachaTodayWidgetService' v06-dex-strings.txt
+          grep -q 'NotificationScheduler' v06-dex-strings.txt
+          grep -q 'NotificationReceiver' v06-dex-strings.txt
+          grep -q 'BootReceiver' v06-dex-strings.txt
+          grep -q 'POST_NOTIFICATIONS' v06-manifest-tree.txt
+
+          {
+            echo 'Dacha Fibonacci v0.6 CI report'
+            echo "UTC build time: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "Debug APK bytes: $(stat -c%s "$DEBUG_APK")"
+            echo "Unsigned release APK bytes: $(stat -c%s "$RELEASE_APK")"
+            sha256sum "$DEBUG_APK" "$RELEASE_APK"
+            echo
+            cat v06-badging.txt
+            echo
+            cat v06-debug-signature.txt
+          } > v06-build-report.txt
+
+      - name: Upload APKs and validation files
+        uses: actions/upload-artifact@v4
+        with:
+          name: dacha-fibonacci-v06-apks
+          path: |
+            project/app/build/outputs/apk/debug/app-debug.apk
+            project/app/build/outputs/apk/release/app-release-unsigned.apk
+            v06-build-report.txt
+            v06-badging.txt
+            v06-debug-signature.txt
+            v06-manifest-tree.txt
+            v06-apk-listing.txt
+            v06-dex-strings.txt
+          if-no-files-found: error
+          retention-days: 14
