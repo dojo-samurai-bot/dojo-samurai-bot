@@ -30,16 +30,18 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '9.5.0'
+          gradle-version: '9.0.0'
 
-      - name: Unpack project
+      - name: Reconstruct and unpack project
         run: |
+          cat chunks/part-* > android-project.zip.b64
           base64 --decode android-project.zip.b64 > android-project.zip
           unzip -q android-project.zip
+          test -f android/settings.gradle
 
       - name: Build debug APK
         working-directory: android
-        run: gradle :app:assembleDebug --stacktrace
+        run: gradle :app:assembleDebug --stacktrace --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
