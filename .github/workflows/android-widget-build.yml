@@ -1,4 +1,4 @@
-name: Build Dacha Fibonacci Widget
+name: Build Dacha Fibonacci v0.4.0
 
 on:
   pull_request:
@@ -10,7 +10,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,14 +35,107 @@ jobs:
         with:
           gradle-version: '9.5.0'
 
+      - name: Reconstruct v0.4.0 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import base64
+          import binascii
+          import struct
+          import zlib
+
+          prefix_paths = [Path(f'v040-chunks/part-{index:02d}') for index in range(6)]
+          prefix_paths.append(Path('v040-chunks/part-06'))
+          prefix = ''.join(path.read_text(encoding='utf-8') for path in prefix_paths)
+          source = Path('v040-chunks/part-06b').read_text(encoding='utf-8')
+
+          def has_valid_local_entries(candidate):
+              try:
+                  raw = base64.b64decode(prefix + candidate, validate=True)
+              except Exception:
+                  return False
+              position = 0
+              entries = 0
+              try:
+                  while position + 4 <= len(raw):
+                      signature = raw[position:position + 4]
+                      if signature in (b'PK\x01\x02', b'PK\x05\x06'):
+                          return entries >= 40
+                      if signature != b'PK\x03\x04':
+                          return False
+                      values = struct.unpack_from('<IHHHHHIIIHH', raw, position)
+                      _, _, flags, method, _, _, crc, compressed_size, original_size, name_length, extra_length = values
+                      if flags & 8:
+                          return False
+                      data_start = position + 30 + name_length + extra_length
+                      compressed = raw[data_start:data_start + compressed_size]
+                      if len(compressed) != compressed_size:
+                          return False
+                      if method == 0:
+                          plain = compressed
+                      elif method == 8:
+                          plain = zlib.decompress(compressed, -15)
+                      else:
+                          return False
+                      if len(plain) != original_size:
+                          return False
+                      if (binascii.crc32(plain) & 0xffffffff) != crc:
+                          return False
+                      position = data_start + compressed_size
+                      entries += 1
+                  return False
+              except Exception:
+                  return False
+
+          repaired = None
+          for index in range(len(source)):
+              candidate = source[:index] + source[index + 1:]
+              if has_valid_local_entries(candidate):
+                  repaired = candidate
+                  print(f'Removed duplicated character at offset {index}')
+                  break
+          if repaired is None:
+              raise SystemExit('Unable to repair part-06b by ZIP entry validation')
+          Path('v040-chunks/part-06b-repaired').write_text(repaired, encoding='utf-8')
+          PY
+
+          cat \
+            v040-chunks/part-00 \
+            v040-chunks/part-01 \
+            v040-chunks/part-02 \
+            v040-chunks/part-03 \
+            v040-chunks/part-04 \
+            v040-chunks/part-05 \
+            v040-chunks/part-06 \
+            v040-chunks/part-06b-repaired \
+            > dacha-v040-truncated.zip.b64
+
+          test "$(wc -c < dacha-v040-truncated.zip.b64)" -eq 80000
+          base64 --decode dacha-v040-truncated.zip.b64 > dacha-v040-truncated.zip
+          yes | zip -FF dacha-v040-truncated.zip --out dacha-v040-repaired.zip > reconstruct-diagnostic.txt 2>&1
+          unzip -t dacha-v040-repaired.zip >> reconstruct-diagnostic.txt
+          cat reconstruct-diagnostic.txt
+          unzip -q dacha-v040-repaired.zip
+
+      - name: Upload reconstruction diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v040-reconstruction-diagnostic
+          path: reconstruct-diagnostic.txt
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Build debug APK
-        working-directory: android-clean
+        working-directory: dacha-fibonacci-v0.4.0
         run: gradle :app:assembleDebug --stacktrace --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: dacha-fibonacci-widget-apk
-          path: android-clean/app/build/outputs/apk/debug/app-debug.apk
+          name: dacha-fibonacci-v0.4.0-apk
+          path: dacha-fibonacci-v0.4.0/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
