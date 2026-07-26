@@ -41,20 +41,63 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
-          import hashlib
+          import base64
+          import binascii
+          import struct
+          import zlib
 
-          path = Path('v040-chunks/part-06b')
-          source = path.read_text(encoding='utf-8')
-          expected = '0d8a3cd8b641065ad90e289e51ee1843ac969f8a1c18b71dac9cbd025e3847f2'
+          prefix_paths = [Path(f'v040-chunks/part-{index:02d}') for index in range(6)]
+          prefix_paths.append(Path('v040-chunks/part-06'))
+          prefix = ''.join(path.read_text(encoding='utf-8') for path in prefix_paths)
+          source = Path('v040-chunks/part-06b').read_text(encoding='utf-8')
+
+          def has_valid_local_entries(candidate):
+              try:
+                  raw = base64.b64decode(prefix + candidate, validate=True)
+              except Exception:
+                  return False
+              position = 0
+              entries = 0
+              try:
+                  while position + 4 <= len(raw):
+                      signature = raw[position:position + 4]
+                      if signature in (b'PK\x01\x02', b'PK\x05\x06'):
+                          return entries >= 40
+                      if signature != b'PK\x03\x04':
+                          return False
+                      values = struct.unpack_from('<IHHHHHIIIHH', raw, position)
+                      _, _, flags, method, _, _, crc, compressed_size, original_size, name_length, extra_length = values
+                      if flags & 8:
+                          return False
+                      data_start = position + 30 + name_length + extra_length
+                      compressed = raw[data_start:data_start + compressed_size]
+                      if len(compressed) != compressed_size:
+                          return False
+                      if method == 0:
+                          plain = compressed
+                      elif method == 8:
+                          plain = zlib.decompress(compressed, -15)
+                      else:
+                          return False
+                      if len(plain) != original_size:
+                          return False
+                      if (binascii.crc32(plain) & 0xffffffff) != crc:
+                          return False
+                      position = data_start + compressed_size
+                      entries += 1
+                  return False
+              except Exception:
+                  return False
+
           repaired = None
           for index in range(len(source)):
               candidate = source[:index] + source[index + 1:]
-              if hashlib.sha256(candidate.encode()).hexdigest() == expected:
+              if has_valid_local_entries(candidate):
                   repaired = candidate
                   print(f'Removed duplicated character at offset {index}')
                   break
           if repaired is None:
-              raise SystemExit('Unable to repair part-06b')
+              raise SystemExit('Unable to repair part-06b by ZIP entry validation')
           Path('v040-chunks/part-06b-repaired').write_text(repaired, encoding='utf-8')
           PY
 
