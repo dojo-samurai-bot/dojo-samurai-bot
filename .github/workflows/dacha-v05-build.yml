@@ -1,0 +1,136 @@
+name: Build Dacha Fibonacci v0.5
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          show-progress: false
+
+      - name: Reconstruct and verify source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat \
+            v05-source/part-00 \
+            v05-source/part-01 \
+            v05-source/part-02 \
+            v05-source/part-03 \
+            v05-source/part-04 \
+            v05-source/part-05 \
+            v05-source/part-06 \
+            v05-source/part-07 \
+            > dacha-v05.tar.xz.b64
+          base64 --decode dacha-v05.tar.xz.b64 > dacha-v05.tar.xz
+          echo "18ce4d343164827da86d5e7500d1635be44148b8def3e259f65894dc2daa46a9  dacha-v05.tar.xz" | sha256sum -c -
+          tar -tJf dacha-v05.tar.xz
+          tar -xJf dacha-v05.tar.xz
+          test -f project/app/build.gradle
+          test -f project/app/src/main/assets/www/index.html
+          test -f project/app/src/main/assets/www/app.js
+          test -f project/app/src/main/assets/www/db.js
+          test -f project/app/src/main/java/ru/dachafibonacci/manager/DachaTodayWidgetProvider.java
+          test -f project/app/src/main/res/layout/dacha_today_widget.xml
+          test -f project/app/src/main/res/xml/dacha_today_widget_info.xml
+          node --check project/app/src/main/assets/www/app.js
+          python3 - <<'PY'
+          import pathlib
+          import xml.etree.ElementTree as ET
+          root = pathlib.Path('project/app/src/main')
+          for path in root.rglob('*.xml'):
+              ET.parse(path)
+              print('XML OK:', path)
+          PY
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses >/dev/null || true
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+
+      - name: Build debug APK
+        working-directory: project
+        shell: bash
+        run: gradle :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Validate APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="project/app/build/outputs/apk/debug/app-debug.apk"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          test -s "$APK"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" > v05-signature.txt
+          "$AAPT" dump badging "$APK" > v05-badging.txt
+          unzip -l "$APK" > v05-apk-listing.txt
+          unzip -p "$APK" classes.dex | strings > v05-dex-strings.txt
+          grep -q 'assets/www/index.html' v05-apk-listing.txt
+          grep -q 'assets/www/app.js' v05-apk-listing.txt
+          grep -q 'assets/www/db.js' v05-apk-listing.txt
+          grep -q 'res/layout/dacha_today_widget.xml' v05-apk-listing.txt
+          grep -q 'res/xml/dacha_today_widget_info.xml' v05-apk-listing.txt
+          grep -q "package: name='ru.dachafibonacci.manager'" v05-badging.txt
+          grep -q "versionName='0.5.0-beta'" v05-badging.txt
+          grep -q 'DachaTodayWidgetProvider' v05-dex-strings.txt
+          grep -q 'DachaWidgetProvider' v05-dex-strings.txt
+
+          OLD_CERT='8a7b3dbf0f7658605240c1936cf16a027c6a7e98866efb6e2b51cdb91f6d9c33'
+          NORMALIZED_SIG="$(tr '[:upper:]' '[:lower:]' < v05-signature.txt | tr -d ':')"
+          if grep -q "$OLD_CERT" <<< "$NORMALIZED_SIG"; then
+            UPDATE_COMPATIBLE=yes
+          else
+            UPDATE_COMPATIBLE=no
+          fi
+
+          {
+            echo 'Dacha Fibonacci v0.5 build report'
+            echo "UTC build time: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "APK bytes: $(stat -c%s "$APK")"
+            echo "Direct update compatible with v0.4.1: $UPDATE_COMPATIBLE"
+            sha256sum "$APK"
+            echo
+            cat v05-badging.txt
+            echo
+            cat v05-signature.txt
+          } > v05-build-report.txt
+
+      - name: Upload APK and validation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dacha-fibonacci-v05-apk
+          path: |
+            project/app/build/outputs/apk/debug/app-debug.apk
+            v05-build-report.txt
+            v05-badging.txt
+            v05-signature.txt
+            v05-apk-listing.txt
+            v05-dex-strings.txt
+          if-no-files-found: error
+          retention-days: 14
