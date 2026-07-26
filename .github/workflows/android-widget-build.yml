@@ -34,7 +34,13 @@ jobs:
 
       - name: Build debug APK
         working-directory: android-clean
-        run: gradle :app:assembleDebug --stacktrace --no-daemon
+        shell: bash
+        run: |
+          if ! gradle :app:assembleDebug --stacktrace --no-daemon > build.log 2>&1; then
+            tail -n 220 build.log
+            exit 1
+          fi
+          tail -n 40 build.log
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
