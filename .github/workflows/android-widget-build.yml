@@ -43,9 +43,14 @@ jobs:
             echo '=== chunks ==='
             wc -c v040-chunks/part-*
             sha256sum v040-chunks/part-*
+            echo '=== invalid characters ==='
+            for f in v040-chunks/part-*; do
+              printf '%s: ' "$f"
+              LC_ALL=C tr -d 'A-Za-z0-9+/=' < "$f" | od -An -tx1
+            done
             : > dacha-v040.zip.b64
             for f in v040-chunks/part-*; do
-              tr -d '[:space:]' < "$f" >> dacha-v040.zip.b64
+              LC_ALL=C tr -cd 'A-Za-z0-9+/=' < "$f" >> dacha-v040.zip.b64
             done
             echo '=== combined ==='
             wc -c dacha-v040.zip.b64
