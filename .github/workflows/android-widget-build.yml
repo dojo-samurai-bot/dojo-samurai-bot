@@ -1,4 +1,4 @@
-name: Build Dacha Fibonacci Widget
+name: Build Dacha Fibonacci v0.3
 
 on:
   pull_request:
@@ -35,14 +35,27 @@ jobs:
         with:
           gradle-version: '9.5.0'
 
-      - name: Build debug APK
-        working-directory: android-clean
+      - name: Reconstruct audited project
+        shell: bash
+        run: |
+          cat v03-chunks/part-* > dacha-v03-lite.zip.b64
+          base64 --decode dacha-v03-lite.zip.b64 > dacha-v03-lite.zip
+          unzip -t dacha-v03-lite.zip
+          unzip -q dacha-v03-lite.zip
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check dacha-v03-lite/app/src/main/assets/www/db.js
+          node --check dacha-v03-lite/app/src/main/assets/www/app.js
+
+      - name: Build audited debug APK
+        working-directory: dacha-v03-lite
         run: gradle :app:assembleDebug --stacktrace --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: dacha-fibonacci-widget-apk
-          path: android-clean/app/build/outputs/apk/debug/app-debug.apk
+          name: dacha-fibonacci-v0.3-audited-apk
+          path: dacha-v03-lite/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
