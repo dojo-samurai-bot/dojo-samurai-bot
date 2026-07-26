@@ -36,11 +36,38 @@ jobs:
           gradle-version: '9.5.0'
 
       - name: Reconstruct v0.4.0 source
+        shell: bash
         run: |
-          cat v040-chunks/part-* > dacha-v040.zip.b64
-          base64 --decode dacha-v040.zip.b64 > dacha-v040.zip
-          unzip -t dacha-v040.zip
+          set +e
+          {
+            echo '=== chunks ==='
+            wc -c v040-chunks/part-*
+            sha256sum v040-chunks/part-*
+            cat v040-chunks/part-* > dacha-v040.zip.b64
+            echo '=== combined ==='
+            wc -c dacha-v040.zip.b64
+            sha256sum dacha-v040.zip.b64
+            base64 --decode dacha-v040.zip.b64 > dacha-v040.zip
+            decode_rc=$?
+            echo "decode_rc=$decode_rc"
+            wc -c dacha-v040.zip
+            sha256sum dacha-v040.zip
+            unzip -t dacha-v040.zip
+            unzip_rc=$?
+            echo "unzip_rc=$unzip_rc"
+          } > reconstruct-diagnostic.txt 2>&1
+          cat reconstruct-diagnostic.txt
+          test "$decode_rc" -eq 0 -a "$unzip_rc" -eq 0
           unzip -q dacha-v040.zip
+
+      - name: Upload reconstruction diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v040-reconstruction-diagnostic
+          path: reconstruct-diagnostic.txt
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Build debug APK
         working-directory: dacha-fibonacci-v0.4.0
