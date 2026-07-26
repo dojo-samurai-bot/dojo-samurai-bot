@@ -36,6 +36,7 @@ jobs:
             stage2-rem/part-04-0 \
             stage2-rem/part-04-1 \
             stage2-rem/part-05-0 \
+            stage2-patches/missing-05-bridge \
             stage2-rem/part-05-1 \
             > project-stage2.zip.b64
           sha256sum project-stage2.zip.b64 | tee stage2-source-sha.txt
