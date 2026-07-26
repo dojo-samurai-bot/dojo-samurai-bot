@@ -38,35 +38,43 @@ jobs:
       - name: Reconstruct v0.4.0 source
         shell: bash
         run: |
-          set +e
-          {
-            echo '=== chunks ==='
-            wc -c v040-chunks/part-*
-            sha256sum v040-chunks/part-*
-            echo '=== invalid characters ==='
-            for f in v040-chunks/part-*; do
-              printf '%s: ' "$f"
-              LC_ALL=C tr -d 'A-Za-z0-9+/=' < "$f" | od -An -tx1
-            done
-            : > dacha-v040.zip.b64
-            for f in v040-chunks/part-*; do
-              LC_ALL=C tr -cd 'A-Za-z0-9+/=' < "$f" >> dacha-v040.zip.b64
-            done
-            echo '=== combined ==='
-            wc -c dacha-v040.zip.b64
-            sha256sum dacha-v040.zip.b64
-            base64 --decode dacha-v040.zip.b64 > dacha-v040.zip
-            decode_rc=$?
-            echo "decode_rc=$decode_rc"
-            wc -c dacha-v040.zip
-            sha256sum dacha-v040.zip
-            unzip -t dacha-v040.zip
-            unzip_rc=$?
-            echo "unzip_rc=$unzip_rc"
-          } > reconstruct-diagnostic.txt 2>&1
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          path = Path('v040-chunks/part-06b')
+          source = path.read_text(encoding='utf-8')
+          expected = '0d8a3cd8b641065ad90e289e51ee1843ac969f8a1c18b71dac9cbd025e3847f2'
+          repaired = None
+          for index in range(len(source)):
+              candidate = source[:index] + source[index + 1:]
+              if hashlib.sha256(candidate.encode()).hexdigest() == expected:
+                  repaired = candidate
+                  print(f'Removed duplicated character at offset {index}')
+                  break
+          if repaired is None:
+              raise SystemExit('Unable to repair part-06b')
+          Path('v040-chunks/part-06b-repaired').write_text(repaired, encoding='utf-8')
+          PY
+
+          cat \
+            v040-chunks/part-00 \
+            v040-chunks/part-01 \
+            v040-chunks/part-02 \
+            v040-chunks/part-03 \
+            v040-chunks/part-04 \
+            v040-chunks/part-05 \
+            v040-chunks/part-06 \
+            v040-chunks/part-06b-repaired \
+            > dacha-v040-truncated.zip.b64
+
+          test "$(wc -c < dacha-v040-truncated.zip.b64)" -eq 80000
+          base64 --decode dacha-v040-truncated.zip.b64 > dacha-v040-truncated.zip
+          yes | zip -FF dacha-v040-truncated.zip --out dacha-v040-repaired.zip > reconstruct-diagnostic.txt 2>&1
+          unzip -t dacha-v040-repaired.zip >> reconstruct-diagnostic.txt
           cat reconstruct-diagnostic.txt
-          test "$decode_rc" -eq 0 -a "$unzip_rc" -eq 0
-          unzip -q dacha-v040.zip
+          unzip -q dacha-v040-repaired.zip
 
       - name: Upload reconstruction diagnostic
         if: always()
