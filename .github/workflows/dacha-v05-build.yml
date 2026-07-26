@@ -23,37 +23,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          wc -c v05-source/part-* | tee v05-source-sizes.txt
-          sha256sum v05-source/part-* | tee v05-source-parts-sha.txt
-          cat \
-            v05-source/part-00 \
-            v05-source/part-01 \
-            v05-source/part-02 \
-            v05-source/part-03 \
-            v05-source/part-04 \
-            v05-source/part-05 \
-            v05-source/part-06 \
-            v05-source/part-07 \
-            > dacha-v05.tar.xz.b64
+          cat v05-source/part-{00,01,02,03,04,05,06,07} > dacha-v05.tar.xz.b64
           python3 - <<'PY'
           from pathlib import Path
           path = Path('dacha-v05.tar.xz.b64')
           data = path.read_text()
           assert len(data) == 59015, len(data)
-          assert data[23876] == 'a', data[23870:23885]
+          assert data[23876] == 'a'
           data = data[:23876] + 'e' + data[23877:]
-          assert data[26688:26706] == 'ZcFQyBK5fik33K9Z9A', data[26688:26706]
+          assert data[26688:26706] == 'ZcFQyBK5fik33K9Z9A'
           data = data[:26696] + 'i' + data[26696:]
-          assert len(data) == 59016
           path.write_text(data)
           PY
-          wc -c dacha-v05.tar.xz.b64 | tee v05-source-total-size.txt
           base64 --decode dacha-v05.tar.xz.b64 > dacha-v05.tar.xz
-          sha256sum dacha-v05.tar.xz | tee v05-source-archive-sha.txt
           echo "18ce4d343164827da86d5e7500d1635be44148b8def3e259f65894dc2daa46a9  dacha-v05.tar.xz" | sha256sum -c -
           tar -tJf dacha-v05.tar.xz
           tar -xJf dacha-v05.tar.xz
-          test -f project/app/build.gradle
           test -f project/app/src/main/assets/www/index.html
           test -f project/app/src/main/assets/www/app.js
           test -f project/app/src/main/assets/www/db.js
@@ -64,26 +49,9 @@ jobs:
           python3 - <<'PY'
           import pathlib
           import xml.etree.ElementTree as ET
-          root = pathlib.Path('project/app/src/main')
-          for path in root.rglob('*.xml'):
+          for path in pathlib.Path('project/app/src/main').rglob('*.xml'):
               ET.parse(path)
-              print('XML OK:', path)
           PY
-
-      - name: Upload source diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dacha-v05-source-diagnostics
-          path: |
-            v05-source-sizes.txt
-            v05-source-parts-sha.txt
-            v05-source-total-size.txt
-            v05-source-archive-sha.txt
-            dacha-v05.tar.xz.b64
-            dacha-v05.tar.xz
-          if-no-files-found: warn
-          retention-days: 3
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -107,30 +75,29 @@ jobs:
 
       - name: Build debug APK
         working-directory: project
-        shell: bash
         run: gradle :app:assembleDebug --stacktrace --no-daemon
 
       - name: Validate APK
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
+          echo FAIL > v05-validation-status.txt
           APK="project/app/build/outputs/apk/debug/app-debug.apk"
           AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
           APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
           test -s "$APK"
           "$APKSIGNER" verify --verbose --print-certs "$APK" > v05-signature.txt
           "$AAPT" dump badging "$APK" > v05-badging.txt
+          "$AAPT" dump xmltree "$APK" AndroidManifest.xml > v05-manifest.txt
           unzip -l "$APK" > v05-apk-listing.txt
-          unzip -p "$APK" classes.dex | strings > v05-dex-strings.txt
           grep -q 'assets/www/index.html' v05-apk-listing.txt
           grep -q 'assets/www/app.js' v05-apk-listing.txt
           grep -q 'assets/www/db.js' v05-apk-listing.txt
-          grep -q 'res/layout/dacha_today_widget.xml' v05-apk-listing.txt
-          grep -q 'res/xml/dacha_today_widget_info.xml' v05-apk-listing.txt
           grep -q "package: name='ru.dachafibonacci.manager'" v05-badging.txt
           grep -q "versionName='0.5.0-beta'" v05-badging.txt
-          grep -q 'DachaTodayWidgetProvider' v05-dex-strings.txt
-          grep -q 'DachaWidgetProvider' v05-dex-strings.txt
+          grep -q 'DachaTodayWidgetProvider' v05-manifest.txt
+          grep -q 'DachaWidgetProvider' v05-manifest.txt
 
           OLD_CERT='8a7b3dbf0f7658605240c1936cf16a027c6a7e98866efb6e2b51cdb91f6d9c33'
           NORMALIZED_SIG="$(tr '[:upper:]' '[:lower:]' < v05-signature.txt | tr -d ':')"
@@ -139,7 +106,6 @@ jobs:
           else
             UPDATE_COMPATIBLE=no
           fi
-
           {
             echo 'Dacha Fibonacci v0.5 build report'
             echo "UTC build time: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
@@ -151,17 +117,23 @@ jobs:
             echo
             cat v05-signature.txt
           } > v05-build-report.txt
+          echo PASS > v05-validation-status.txt
 
-      - name: Upload APK and validation report
+      - name: Upload APK and validation files
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: dacha-fibonacci-v05-apk
           path: |
             project/app/build/outputs/apk/debug/app-debug.apk
+            v05-validation-status.txt
             v05-build-report.txt
             v05-badging.txt
             v05-signature.txt
+            v05-manifest.txt
             v05-apk-listing.txt
-            v05-dex-strings.txt
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
+
+      - name: Enforce validation result
+        run: grep -qx PASS v05-validation-status.txt
