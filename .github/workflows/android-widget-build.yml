@@ -24,6 +24,9 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses >/dev/null || true
+
       - name: Install Android SDK packages
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
@@ -32,22 +35,21 @@ jobs:
         with:
           gradle-version: '9.5.0'
 
-      - name: Build debug APK
-        working-directory: android-clean
-        shell: bash
-        run: gradle :app:assembleDebug --stacktrace --no-daemon > build.log 2>&1
+      - name: Reconstruct Android project archive
+        run: |
+          cat chunks/part-* > android-project.zip.b64
+          base64 --decode android-project.zip.b64 > android-project.zip
+          unzip -t android-project.zip
+          unzip -q android-project.zip
 
-      - name: Upload build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-build-log
-          path: android-clean/build.log
-          if-no-files-found: warn
+      - name: Build debug APK
+        working-directory: android
+        run: gradle :app:assembleDebug --stacktrace --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: dacha-fibonacci-widget-apk
-          path: android-clean/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 14
