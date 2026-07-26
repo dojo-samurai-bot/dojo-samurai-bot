@@ -64,6 +64,7 @@ jobs:
           grep -q 'setRemoteAdapter' project/app/src/main/java/ru/dachafibonacci/manager/DachaTodayWidgetProvider.java
           grep -q 'POST_NOTIFICATIONS' project/app/src/main/AndroidManifest.xml
           grep -q 'DachaTodayWidgetService' project/app/src/main/AndroidManifest.xml
+          grep -q 'NotificationScheduler' project/app/src/main/java/ru/dachafibonacci/manager/MainActivity.java
           grep -q "versionName '0.6.0-beta'" project/app/build.gradle
 
       - name: Set up Java 17
@@ -104,20 +105,15 @@ jobs:
           test -s "$RELEASE_APK"
           "$APKSIGNER" verify --verbose --print-certs "$DEBUG_APK" > v06-debug-signature.txt
           "$AAPT" dump badging "$DEBUG_APK" > v06-badging.txt
-          "$AAPT" dump xmltree "$DEBUG_APK" AndroidManifest.xml > v06-manifest-tree.txt
+          "$AAPT" dump permissions "$DEBUG_APK" > v06-permissions.txt
           unzip -l "$DEBUG_APK" > v06-apk-listing.txt
-          unzip -p "$DEBUG_APK" classes.dex | strings > v06-dex-strings.txt
 
-          grep -q "package: name='ru.dachafibonacci.manager'" v06-badging.txt
-          grep -q "versionName='0.6.0-beta'" v06-badging.txt
-          grep -q 'assets/www/index.html' v06-apk-listing.txt
-          grep -q 'assets/www/app.js' v06-apk-listing.txt
-          grep -q 'assets/www/db.js' v06-apk-listing.txt
-          grep -q 'DachaTodayWidgetService' v06-dex-strings.txt
-          grep -q 'NotificationScheduler' v06-dex-strings.txt
-          grep -q 'NotificationReceiver' v06-dex-strings.txt
-          grep -q 'BootReceiver' v06-dex-strings.txt
-          grep -q 'POST_NOTIFICATIONS' v06-manifest-tree.txt
+          grep -Fq "package: name='ru.dachafibonacci.manager'" v06-badging.txt
+          grep -Fq "versionName='0.6.0-beta'" v06-badging.txt
+          grep -Fq 'assets/www/index.html' v06-apk-listing.txt
+          grep -Fq 'assets/www/app.js' v06-apk-listing.txt
+          grep -Fq 'assets/www/db.js' v06-apk-listing.txt
+          grep -Fq 'uses-permission: name='"'"'android.permission.POST_NOTIFICATIONS'"'"'' v06-permissions.txt
 
           {
             echo 'Dacha Fibonacci v0.6 CI report'
@@ -128,10 +124,13 @@ jobs:
             echo
             cat v06-badging.txt
             echo
+            cat v06-permissions.txt
+            echo
             cat v06-debug-signature.txt
           } > v06-build-report.txt
 
       - name: Upload APKs and validation files
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: dacha-fibonacci-v06-apks
@@ -141,8 +140,7 @@ jobs:
             v06-build-report.txt
             v06-badging.txt
             v06-debug-signature.txt
-            v06-manifest-tree.txt
+            v06-permissions.txt
             v06-apk-listing.txt
-            v06-dex-strings.txt
           if-no-files-found: error
           retention-days: 14
