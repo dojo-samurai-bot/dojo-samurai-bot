@@ -129,6 +129,17 @@ jobs:
             cat v06-debug-signature.txt
           } > v06-build-report.txt
 
+      - name: Package signing tools
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p v06-signing-tools/lib
+          cp "$ANDROID_HOME/build-tools/36.0.0/apksigner" v06-signing-tools/apksigner
+          cp "$ANDROID_HOME/build-tools/36.0.0/zipalign" v06-signing-tools/zipalign
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" v06-signing-tools/lib/apksigner.jar
+          chmod +x v06-signing-tools/apksigner v06-signing-tools/zipalign
+
       - name: Upload APKs and validation files
         if: always()
         uses: actions/upload-artifact@v4
@@ -142,5 +153,6 @@ jobs:
             v06-debug-signature.txt
             v06-permissions.txt
             v06-apk-listing.txt
+            v06-signing-tools/
           if-no-files-found: error
           retention-days: 14
