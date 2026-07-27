@@ -52,6 +52,8 @@ jobs:
           echo "6f163e13e26e60d74336a8cc76da0e72bef1d7aaaa798af29fde1aed8570108d  room.patch" | sha256sum -c -
           cd dacha-v070-project
           git apply ../room.patch
+          sed -i 's/^android.useAndroidX=false$/android.useAndroidX=true/' gradle.properties
+          grep -Fxq 'android.useAndroidX=true' gradle.properties
           mkdir -p app/schemas
           cd ..
 
@@ -76,6 +78,7 @@ jobs:
           grep -Fq "versionName '0.7.0'" "$R/app/build.gradle"
           grep -Fq 'androidx.room:room-runtime' "$R/app/build.gradle"
           grep -Fq 'androidx.room:room-compiler' "$R/app/build.gradle"
+          grep -Fxq 'android.useAndroidX=true' "$R/gradle.properties"
           test -s "$D/DachaDatabase.java"
           test -s "$D/RoomStore.java"
           test -s "$D/NativeDatabaseBridge.java"
