@@ -1,0 +1,137 @@
+name: Build Dacha Fibonacci v0.7.0 clean
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct exact sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat v061-source/part-00 v061-source/part-01 v061-source/part-02 v061-source/part-03 > v061.tar.xz.b64
+          test "$(wc -c < v061.tar.xz.b64)" -eq 70924
+          base64 --decode v061.tar.xz.b64 > v061.tar.xz
+          echo "303dab18c9c2989fe64a558af4131499c642a8141a8ee2451558a52b0a49169e  v061.tar.xz" | sha256sum -c -
+          tar -xJf v061.tar.xz
+
+          cat v070-sync-patch-b64/part-00 v070-sync-patch-b64/part-01 v070-sync-patch-b64/part-02 > v070.patch.xz.b64
+          test "$(wc -c < v070.patch.xz.b64)" -eq 27596
+          base64 --decode v070.patch.xz.b64 > v070.patch.xz
+          echo "4096e2e69c64d22afc1b5ee99e940ce454cf62d49032dbe9b7e2110813e71a40  v070.patch.xz" | sha256sum -c -
+          xz -dc v070.patch.xz > v070.patch
+          echo "746f2c2174d9120cdb3bacef6f4f7dd850ce79e82b7f7b0f8512563295efe3e1  v070.patch" | sha256sum -c -
+
+          cp -a dacha-v061-project dacha-v070-project
+          cd dacha-v070-project
+          git init -q
+          git add .
+          git -c user.email=ci@dachafibonacci.local -c user.name=CI commit -qm baseline
+          git apply ../v070.patch
+          cd ..
+
+          cat v070-server-b64/part-00 v070-server-b64/part-01 > server.tar.xz.b64
+          test "$(wc -c < server.tar.xz.b64)" -eq 11180
+          base64 --decode server.tar.xz.b64 > server.tar.xz
+          echo "6bf67949db9a369ea14a810576205eb221899a0f9aa837ec813f71a13bf5aa7b  server.tar.xz" | sha256sum -c -
+          tar -xJf server.tar.xz
+
+      - name: Validate application and server
+        shell: bash
+        run: |
+          set -euo pipefail
+          WEB=dacha-v070-project/app/src/main/assets/www
+          JAVA=dacha-v070-project/app/src/main/java/ru/dachafibonacci/manager/MainActivity.java
+          node --check "$WEB/app.js"
+          node --check "$WEB/db.js"
+          node --check "$WEB/sync.js"
+          cp server/apps-script/Code.gs /tmp/Code.js
+          node --check /tmp/Code.js
+          grep -Fq "versionName '0.7.0'" dacha-v070-project/app/build.gradle
+          grep -Fq "versionCode 10" dacha-v070-project/app/build.gradle
+          grep -Fq "Кубышка идей" "$WEB/app.js"
+          grep -Fq "window.DachaSync" "$WEB/sync.js"
+          grep -Fq "saveSyncConnectionButton" "$WEB/index.html"
+          grep -Fq "requestHash" server/apps-script/Code.gs
+          grep -Fq "ACTION_CREATE_DOCUMENT" "$JAVA"
+          if grep -R -E "createSyncFile|selectSyncFile|readSyncFile|readSyncFileFresh|writeSyncFile|disconnectSyncFile|SYNC_URI_KEY|SYNC_LABEL_KEY" dacha-v070-project/app/src/main; then
+            echo "Legacy shared-file synchronization remains" >&2
+            exit 1
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          app = Path('dacha-v070-project/app/src/main/assets/www/app.js').read_text()
+          block = app[app.index('function buildWidgetSnapshot()'):app.index('function syncAndroidWidget()')]
+          assert 'ideas' not in block
+          sync = Path('dacha-v070-project/app/src/main/assets/www/sync.js').read_text()
+          assert all(x in sync for x in ('outbox', 'conflicts', 'syncAccessToken'))
+          print('source validation passed')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+
+      - name: Build APKs
+        working-directory: dacha-v070-project
+        run: gradle :app:assembleDebug :app:assembleRelease --stacktrace --no-daemon
+
+      - name: Validate and package results
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEBUG=dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
+          RELEASE=dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          ZIPALIGN="$ANDROID_HOME/build-tools/36.0.0/zipalign"
+          test -s "$DEBUG"
+          test -s "$RELEASE"
+          "$AAPT" dump badging "$DEBUG" > v070-badging.txt
+          "$ZIPALIGN" -c -p -v 4 "$RELEASE" > v070-release-alignment.txt
+          unzip -l "$DEBUG" > v070-apk-listing.txt
+          grep -Fq "package: name='ru.dachafibonacci.manager'" v070-badging.txt
+          grep -Fq "versionCode='10'" v070-badging.txt
+          grep -Fq "versionName='0.7.0'" v070-badging.txt
+          grep -Fq "assets/www/sync.js" v070-apk-listing.txt
+          grep -Fq "Verification successful" v070-release-alignment.txt
+          tar --exclude='.git' --exclude='.gradle' --exclude='*/build' -cJf dacha-v070-editable-source.tar.xz dacha-v070-project server/apps-script
+          sha256sum "$DEBUG" "$RELEASE" dacha-v070-editable-source.tar.xz > v070-sha256.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dacha-fibonacci-v070-sync-development
+          path: |
+            dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
+            dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
+            dacha-v070-editable-source.tar.xz
+            v070-sha256.txt
+            v070-badging.txt
+            v070-release-alignment.txt
+            v070-apk-listing.txt
+            server/apps-script/
+          if-no-files-found: error
+          retention-days: 7
