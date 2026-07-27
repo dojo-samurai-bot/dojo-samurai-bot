@@ -58,12 +58,12 @@ jobs:
           cd ..
 
           cat v070-server-b64/part-{00,01} > server.tar.xz.b64
-          test "$(wc -c < server.tar.xz.b64)" -eq 11180
+          test "$(wc -c < server.tar.xz.b64)" -eq 13432
           base64 -d server.tar.xz.b64 > server.tar.xz
-          echo "6bf67949db9a369ea14a810576205eb221899a0f9aa837ec813f71a13bf5aa7b  server.tar.xz" | sha256sum -c -
+          echo "3dfe9da01832fb5aa2e1b28b05b98d9912f202d9e93a70f53c942c9db0d387ef  server.tar.xz" | sha256sum -c -
           tar -xJf server.tar.xz
 
-      - name: Validate Room source
+      - name: Validate Room source and sync protocol
         shell: bash
         run: |
           set -euo pipefail
@@ -75,6 +75,7 @@ jobs:
           node --check "$W/db.js"
           node --check "$W/sync.js"
           cp server/apps-script/Code.gs /tmp/Code.js && node --check /tmp/Code.js
+          node server/tests/sync-server.test.js server/apps-script/Code.gs
           grep -Fq "versionName '0.7.0'" "$R/app/build.gradle"
           grep -Fq 'androidx.room:room-runtime' "$R/app/build.gradle"
           grep -Fq 'androidx.room:room-compiler' "$R/app/build.gradle"
@@ -153,7 +154,7 @@ jobs:
           test -n "$SCHEMA"
           grep -Fq 'store_records' "$SCHEMA"
           grep -Fq 'room_meta' "$SCHEMA"
-          tar --exclude='.git' --exclude='.gradle' --exclude='*/build' -cJf dacha-v070-editable-source.tar.xz dacha-v070-project server/apps-script
+          tar --exclude='.git' --exclude='.gradle' --exclude='*/build' -cJf dacha-v070-editable-source.tar.xz dacha-v070-project server/apps-script server/tests
           sha256sum "$DEBUG" "$RELEASE" "$SCHEMA" dacha-v070-editable-source.tar.xz > v070-sha256.txt
 
       - uses: actions/upload-artifact@v4
@@ -171,5 +172,6 @@ jobs:
             v070-release-alignment.txt
             v070-apk-listing.txt
             server/apps-script/
+            server/tests/
           if-no-files-found: warn
           retention-days: 7
