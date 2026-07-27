@@ -92,8 +92,8 @@ jobs:
           assert 'outbox' in sync and 'conflicts' in sync
           assert 'syncAccessToken' in sync
           main = Path('dacha-v070-project/app/src/main/java/ru/dachafibonacci/manager/MainActivity.java').read_text()
-          assert 'ACTION_CREATE_DOCUMENT' in main, 'backup export must remain available'
-          assert 'ACTION_OPEN_DOCUMENT' in main, 'backup import must remain available'
+          assert 'exportBackup' in main, 'backup export bridge must remain available'
+          assert 'importBackup' in main, 'backup import bridge must remain available'
           print('v0.7 sync source assertions passed')
           PY
 
