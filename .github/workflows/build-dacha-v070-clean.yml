@@ -77,10 +77,11 @@ jobs:
           grep -Fq "saveSyncConnectionButton" dacha-v070-project/app/src/main/assets/www/index.html
           grep -Fq "function bridgeOutput_" server/apps-script/Code.gs
           grep -Fq "requestHash" server/apps-script/Code.gs
-          if grep -R -E "createSyncFile|selectSyncFile|readSyncFile|writeSyncFile|disconnectSyncFile|ACTION_OPEN_DOCUMENT|ACTION_CREATE_DOCUMENT|SYNC_URI_KEY" dacha-v070-project/app/src/main; then
-            echo "Legacy SAF synchronization is still present" >&2
+          if grep -R -E "createSyncFile|selectSyncFile|readSyncFile|readSyncFileFresh|writeSyncFile|disconnectSyncFile|SYNC_URI_KEY|SYNC_LABEL_KEY" dacha-v070-project/app/src/main; then
+            echo "Legacy shared-file synchronization is still present" >&2
             exit 1
           fi
+          grep -Fq "Intent.ACTION_CREATE_DOCUMENT" dacha-v070-project/app/src/main/java/ru/dachafibonacci/manager/MainActivity.java
           python3 - <<'PY'
           from pathlib import Path
           app = Path('dacha-v070-project/app/src/main/assets/www/app.js').read_text()
