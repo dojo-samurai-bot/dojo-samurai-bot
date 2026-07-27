@@ -43,8 +43,9 @@ jobs:
           git -c user.email=ci@dachafibonacci.local -c user.name=CI commit -qm v070-sync-baseline
           cd ..
 
-          cat v070-room-patch-b64/part-00 v070-room-patch-b64/part-01 > v070-room.patch.xz.b64
+          cat v070-room-patch-safe/part-00 v070-room-patch-safe/part-01 v070-room-patch-safe/part-02 v070-room-patch-safe/part-03 > v070-room.patch.xz.b64
           test "$(wc -c < v070-room.patch.xz.b64)" -eq 12464
+          echo "474e98e6e6c7f3200c5c4eb2016ed608b917f0f296a8ba59a2a66a1badcdab25  v070-room.patch.xz.b64" | sha256sum -c -
           base64 --decode v070-room.patch.xz.b64 > v070-room.patch.xz
           test "$(wc -c < v070-room.patch.xz)" -eq 9348
           echo "33bf27a005102f8b02ebe013b1897152cdb683c3cb6470810db33f04a09ab197  v070-room.patch.xz" | sha256sum -c -
