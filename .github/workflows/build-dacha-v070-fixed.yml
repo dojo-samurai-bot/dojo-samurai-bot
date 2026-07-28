@@ -1,0 +1,117 @@
+name: Build Dacha Fibonacci v0.7.0 fixed
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct source and apply all patches
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat v061-source/part-{00,01,02,03} > v061.tar.xz.b64
+          base64 -d v061.tar.xz.b64 > v061.tar.xz
+          echo "303dab18c9c2989fe64a558af4131499c642a8141a8ee2451558a52b0a49169e  v061.tar.xz" | sha256sum -c -
+          tar -xJf v061.tar.xz
+
+          cat v070-sync-patch-b64/part-{00,01,02} > sync.xz.b64
+          base64 -d sync.xz.b64 > sync.xz
+          xz -dc sync.xz > sync.patch
+
+          cp -a dacha-v061-project dacha-v070-project
+          cd dacha-v070-project
+          git init -q
+          git add .
+          git -c user.email=ci@dachafibonacci.local -c user.name=CI commit -qm baseline
+          git apply ../sync.patch
+          git add .
+          git -c user.email=ci@dachafibonacci.local -c user.name=CI commit -qm sync
+          cd ..
+
+          cat v070-room-patch-safe/part-{00,01,02,03} > room.xz.b64
+          base64 -d room.xz.b64 > room.xz
+          xz -dc room.xz > room.patch
+          cd dacha-v070-project
+          git apply ../room.patch
+          sed -i 's/^android.useAndroidX=false$/android.useAndroidX=true/' gradle.properties
+          mkdir -p app/schemas
+          git add .
+          git -c user.email=ci@dachafibonacci.local -c user.name=CI commit -qm room
+          cd ..
+
+          cat v070-test-fixes-b64/part-00 > fixes.xz.b64
+          test "$(wc -c < fixes.xz.b64)" -eq 3036
+          echo "d4f71f286d33b66b6a0b9293b94debc465ea8b051f72a5ef8efe285ea24d7c1c  fixes.xz.b64" | sha256sum -c -
+          base64 -d fixes.xz.b64 > fixes.xz
+          echo "0b801e3d341786c7747f9da369b7535969568d72151bdd6675019d8261004bd4  fixes.xz" | sha256sum -c -
+          xz -dc fixes.xz > fixes.patch
+          echo "c2018e1c673d1b8ea3b7caff9a548e19c81f8aedfcee53d4701a2b38f076dfee  fixes.patch" | sha256sum -c -
+          cd dacha-v070-project
+          git apply ../fixes.patch
+
+      - name: Validate fixed source
+        shell: bash
+        run: |
+          set -euo pipefail
+          R=dacha-v070-project
+          node --check "$R/app/src/main/assets/www/app.js"
+          node --check "$R/app/src/main/assets/www/db.js"
+          grep -Fq 'SCHEDULE_EXACT_ALARM' "$R/app/src/main/AndroidManifest.xml"
+          grep -Fq 'setExactAndAllowWhileIdle' "$R/app/src/main/java/ru/dachafibonacci/manager/NotificationScheduler.java"
+          grep -Fq '.commit();' "$R/app/src/main/java/ru/dachafibonacci/manager/data/WidgetSnapshotRepository.java"
+          grep -Fq 'name="repeat"' "$R/app/src/main/assets/www/app.js"
+          grep -Fq "task.repeat === 'weekly'" "$R/app/src/main/assets/www/app.js"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+
+      - name: Build APKs
+        working-directory: dacha-v070-project
+        run: gradle :app:assembleDebug :app:assembleRelease --stacktrace --no-daemon
+
+      - name: Validate and package APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEBUG=dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
+          RELEASE=dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
+          test -s "$DEBUG"
+          test -s "$RELEASE"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$DEBUG" > fixed-badging.txt
+          grep -Fq "package: name='ru.dachafibonacci.manager'" fixed-badging.txt
+          grep -Fq "versionName='0.7.0'" fixed-badging.txt
+          sha256sum "$DEBUG" "$RELEASE" > fixed-sha256.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dacha-fibonacci-v070-fixed
+          path: |
+            dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
+            dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
+            fixed-badging.txt
+            fixed-sha256.txt
+          if-no-files-found: error
+          retention-days: 7
