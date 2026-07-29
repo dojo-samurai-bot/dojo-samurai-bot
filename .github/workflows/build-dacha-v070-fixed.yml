@@ -1,4 +1,4 @@
-name: Build Dacha Fibonacci v0.7.0 fixed
+name: Build Dacha Fibonacci v0.7.1 sync fixed
 
 on:
   pull_request:
@@ -61,12 +61,12 @@ jobs:
           cd ..
 
           cat v070-sync-transport-fix-b64/part-00 > transport.xz.b64
-          test "$(wc -c < transport.xz.b64)" -eq 2264
-          echo "9f30ffbe4bacb0e16b10ef2e50fde683b66951d35cfb19f9179843802c57d446  transport.xz.b64" | sha256sum -c -
+          test "$(wc -c < transport.xz.b64)" -eq 2808
+          echo "43cc2b13e98039181deeef237fb5cfc6b82445b0ffc14f2b65c46fdd365bcba8  transport.xz.b64" | sha256sum -c -
           base64 -d transport.xz.b64 > transport.xz
-          echo "b1408fd1e6d9762e6c615345e021c77296b9102d2f39c4b41aa5e1f2a8690ce5  transport.xz" | sha256sum -c -
+          echo "627b157d433831b5e07d6b63f2efdb98d7ebe367c104ba959152dfd712f438c9  transport.xz" | sha256sum -c -
           xz -dc transport.xz > transport.patch
-          echo "d9943e6fc9d2d657f6d587c50ee774b4d26fc0958ba29d6e70f72e566e09c410  transport.patch" | sha256sum -c -
+          echo "f178fe32141ea696e3108fb45c26cf9c4ddc0677ef7c31f2f7520dbd3c0bda06  transport.patch" | sha256sum -c -
           cd dacha-v070-project
           git apply ../transport.patch
 
@@ -85,6 +85,9 @@ jobs:
           grep -Fq "task.repeat === 'weekly'" "$R/app/src/main/assets/www/app.js"
           grep -Fq 'syncRequest(String endpoint, String requestJson)' "$R/app/src/main/java/ru/dachafibonacci/manager/WidgetBridge.java"
           grep -Fq "window.AndroidBridge.syncRequest" "$R/app/src/main/assets/www/sync.js"
+          grep -Fq "if (status == 301 || status == 302 || status == 303) sendPostBody = false;" "$R/app/src/main/java/ru/dachafibonacci/manager/WidgetBridge.java"
+          grep -Fq "versionName '0.7.1'" "$R/app/build.gradle"
+          grep -Fq "versionCode 11" "$R/app/build.gradle"
 
       - uses: actions/setup-java@v4
         with:
@@ -116,12 +119,13 @@ jobs:
           test -s "$RELEASE"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$DEBUG" > fixed-badging.txt
           grep -Fq "package: name='ru.dachafibonacci.manager'" fixed-badging.txt
-          grep -Fq "versionName='0.7.0'" fixed-badging.txt
+          grep -Fq "versionName='0.7.1'" fixed-badging.txt
+          grep -Fq "versionCode='11'" fixed-badging.txt
           sha256sum "$DEBUG" "$RELEASE" > fixed-sha256.txt
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dacha-fibonacci-v070-sync-fixed
+          name: dacha-fibonacci-v071-sync-fixed
           path: |
             dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
             dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
