@@ -58,6 +58,17 @@ jobs:
           echo "c2018e1c673d1b8ea3b7caff9a548e19c81f8aedfcee53d4701a2b38f076dfee  fixes.patch" | sha256sum -c -
           cd dacha-v070-project
           git apply ../fixes.patch
+          cd ..
+
+          cat v070-sync-transport-fix-b64/part-00 > transport.xz.b64
+          test "$(wc -c < transport.xz.b64)" -eq 2264
+          echo "9f30ffbe4bacb0e16b10ef2e50fde683b66951d35cfb19f9179843802c57d446  transport.xz.b64" | sha256sum -c -
+          base64 -d transport.xz.b64 > transport.xz
+          echo "b1408fd1e6d9762e6c615345e021c77296b9102d2f39c4b41aa5e1f2a8690ce5  transport.xz" | sha256sum -c -
+          xz -dc transport.xz > transport.patch
+          echo "d9943e6fc9d2d657f6d587c50ee774b4d26fc0958ba29d6e70f72e566e09c410  transport.patch" | sha256sum -c -
+          cd dacha-v070-project
+          git apply ../transport.patch
 
       - name: Validate fixed source
         shell: bash
@@ -66,11 +77,14 @@ jobs:
           R=dacha-v070-project
           node --check "$R/app/src/main/assets/www/app.js"
           node --check "$R/app/src/main/assets/www/db.js"
+          node --check "$R/app/src/main/assets/www/sync.js"
           grep -Fq 'SCHEDULE_EXACT_ALARM' "$R/app/src/main/AndroidManifest.xml"
           grep -Fq 'setExactAndAllowWhileIdle' "$R/app/src/main/java/ru/dachafibonacci/manager/NotificationScheduler.java"
           grep -Fq '.commit();' "$R/app/src/main/java/ru/dachafibonacci/manager/data/WidgetSnapshotRepository.java"
           grep -Fq 'name="repeat"' "$R/app/src/main/assets/www/app.js"
           grep -Fq "task.repeat === 'weekly'" "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'syncRequest(String endpoint, String requestJson)' "$R/app/src/main/java/ru/dachafibonacci/manager/WidgetBridge.java"
+          grep -Fq "window.AndroidBridge.syncRequest" "$R/app/src/main/assets/www/sync.js"
 
       - uses: actions/setup-java@v4
         with:
@@ -107,7 +121,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dacha-fibonacci-v070-fixed
+          name: dacha-fibonacci-v070-sync-fixed
           path: |
             dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
             dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
