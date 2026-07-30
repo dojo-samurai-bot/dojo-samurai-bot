@@ -1,4 +1,4 @@
-name: Build Dacha Fibonacci v0.7.1 sync fixed
+name: Build Dacha Fibonacci v0.7.2 performance and UI fixed
 
 on:
   pull_request:
@@ -69,6 +69,17 @@ jobs:
           echo "f178fe32141ea696e3108fb45c26cf9c4ddc0677ef7c31f2f7520dbd3c0bda06  transport.patch" | sha256sum -c -
           cd dacha-v070-project
           git apply ../transport.patch
+          cd ..
+
+          cat v072-ui-performance-fix-b64/part-00 > v072-fix.xz.b64
+          test "$(wc -c < v072-fix.xz.b64)" -eq 7100
+          echo "cd0835ccbd4a04162a969b32db78eb92adf935529632553e282269e3b5fd3f0b  v072-fix.xz.b64" | sha256sum -c -
+          base64 -d v072-fix.xz.b64 > v072-fix.xz
+          echo "b0b9b156622b7b53275e861183fe18b6104c9e8f085c0665907b63617f345a25  v072-fix.xz" | sha256sum -c -
+          xz -dc v072-fix.xz > v072-fix.patch
+          echo "22957ea30f1ae3e7455c3ff7355281d270d11d1b42a85c3cea4fb5e87b63dc41  v072-fix.patch" | sha256sum -c -
+          cd dacha-v070-project
+          git apply ../v072-fix.patch
 
       - name: Validate fixed source
         shell: bash
@@ -83,11 +94,15 @@ jobs:
           grep -Fq '.commit();' "$R/app/src/main/java/ru/dachafibonacci/manager/data/WidgetSnapshotRepository.java"
           grep -Fq 'name="repeat"' "$R/app/src/main/assets/www/app.js"
           grep -Fq "task.repeat === 'weekly'" "$R/app/src/main/assets/www/app.js"
-          grep -Fq 'syncRequest(String endpoint, String requestJson)' "$R/app/src/main/java/ru/dachafibonacci/manager/WidgetBridge.java"
+          grep -Fq 'syncRequest(String requestId, String endpoint, String requestJson)' "$R/app/src/main/java/ru/dachafibonacci/manager/WidgetBridge.java"
           grep -Fq "window.AndroidBridge.syncRequest" "$R/app/src/main/assets/www/sync.js"
           grep -Fq "if (status == 301 || status == 302 || status == 303) sendPostBody = false;" "$R/app/src/main/java/ru/dachafibonacci/manager/WidgetBridge.java"
-          grep -Fq "versionName '0.7.1'" "$R/app/build.gradle"
-          grep -Fq "versionCode 11" "$R/app/build.gradle"
+          grep -Fq 'window.DachaNativeSync' "$R/app/src/main/assets/www/sync.js"
+          grep -Fq '.detail-dialog[open] { display: flex; flex-direction: column; }' "$R/app/src/main/assets/www/styles.css"
+          grep -Fq 'id="confirmDialog"' "$R/app/src/main/assets/www/index.html"
+          ! grep -Fq 'confirm(' "$R/app/src/main/assets/www/app.js"
+          grep -Fq "versionName '0.7.2'" "$R/app/build.gradle"
+          grep -Fq "versionCode 12" "$R/app/build.gradle"
 
       - uses: actions/setup-java@v4
         with:
@@ -115,21 +130,29 @@ jobs:
           set -euo pipefail
           DEBUG=dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
           RELEASE=dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
+          ALIGNED=dacha-v070-project/app/build/outputs/apk/release/dacha-fibonacci-v072-aligned-unsigned.apk
           test -s "$DEBUG"
           test -s "$RELEASE"
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -f -p 4 "$RELEASE" "$ALIGNED"
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -p -v 4 "$ALIGNED" > fixed-release-alignment.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$DEBUG" > fixed-badging.txt
           grep -Fq "package: name='ru.dachafibonacci.manager'" fixed-badging.txt
-          grep -Fq "versionName='0.7.1'" fixed-badging.txt
-          grep -Fq "versionCode='11'" fixed-badging.txt
-          sha256sum "$DEBUG" "$RELEASE" > fixed-sha256.txt
+          grep -Fq "versionName='0.7.2'" fixed-badging.txt
+          grep -Fq "versionCode='12'" fixed-badging.txt
+          grep -Fq 'Verification successful' fixed-release-alignment.txt
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" apksigner.jar
+          sha256sum "$DEBUG" "$RELEASE" "$ALIGNED" apksigner.jar > fixed-sha256.txt
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dacha-fibonacci-v071-sync-fixed
+          name: dacha-fibonacci-v072-performance-ui-fixed
           path: |
             dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
             dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
+            dacha-v070-project/app/build/outputs/apk/release/dacha-fibonacci-v072-aligned-unsigned.apk
+            apksigner.jar
             fixed-badging.txt
             fixed-sha256.txt
+            fixed-release-alignment.txt
           if-no-files-found: error
           retention-days: 7
