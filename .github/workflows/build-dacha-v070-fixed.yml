@@ -83,12 +83,12 @@ jobs:
           cd ..
 
           cat v073-widget-notification-fix-b64/part-00 > v073-fix.xz.b64
-          test "$(wc -c < v073-fix.xz.b64)" -eq 9164
-          echo "46c8030133d299234afe269e790cdd480ea197b188ab4e9cf7b053e74707a6d9  v073-fix.xz.b64" | sha256sum -c -
+          test "$(wc -c < v073-fix.xz.b64)" -eq 9352
+          echo "9ba76dea0b2346e2c16d892d59f6f1ddbaf16b618a8277a2c87ec27677195220  v073-fix.xz.b64" | sha256sum -c -
           base64 -d v073-fix.xz.b64 > v073-fix.xz
-          echo "1b4d22befb2f04aa09ab12a969646c53849398eb3446bcc5a0a0d750846accc0  v073-fix.xz" | sha256sum -c -
+          echo "96091d5d927aab87b3fc34ba4c3a0fefad84351e4ec5c8541ed8b90fd48da26f  v073-fix.xz" | sha256sum -c -
           xz -dc v073-fix.xz > v073-fix.patch
-          echo "342333bb761c6c2cbf8985cc5a3c7d0afeae8572274d17a7a347274d127ff220  v073-fix.patch" | sha256sum -c -
+          echo "6dfe0a810fdc19958b88a48f2a60498508eb3d6180dc2aba367d8b5fe83a8d49  v073-fix.patch" | sha256sum -c -
           cd dacha-v070-project
           git apply ../v073-fix.patch
 
@@ -119,6 +119,7 @@ jobs:
           grep -Fq 'sendTestNotification' "$R/app/src/main/java/ru/dachafibonacci/manager/NotificationScheduler.java"
           grep -Fq 'areNotificationsEnabled()' "$R/app/src/main/java/ru/dachafibonacci/manager/NotificationScheduler.java"
           grep -Fq 'id="testNotificationButton"' "$R/app/src/main/assets/www/index.html"
+          grep -Fq 'onAppResume() { refreshData(); queueSync(250);' "$R/app/src/main/assets/www/app.js"
           grep -Fq "versionName '0.7.3'" "$R/app/build.gradle"
           grep -Fq "versionCode 13" "$R/app/build.gradle"
 
