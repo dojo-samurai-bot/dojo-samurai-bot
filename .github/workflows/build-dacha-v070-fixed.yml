@@ -1,4 +1,4 @@
-name: Build Dacha Fibonacci v0.7.3 notifications and widget actions
+name: Build Nash Mir v0.7.4 shopping widget action
 
 on:
   pull_request:
@@ -91,6 +91,17 @@ jobs:
           echo "6dfe0a810fdc19958b88a48f2a60498508eb3d6180dc2aba367d8b5fe83a8d49  v073-fix.patch" | sha256sum -c -
           cd dacha-v070-project
           git apply ../v073-fix.patch
+          cd ..
+
+          cat v074-final-b64/part-{00,01,02,03,04} > v074-fix.xz.b64
+          test "$(wc -c < v074-fix.xz.b64)" -eq 99816
+          echo "c8c173b05ec512914116d03642b6ea69b381d377168ddca7343237fddbc4702f  v074-fix.xz.b64" | sha256sum -c -
+          base64 -d v074-fix.xz.b64 > v074-fix.xz
+          echo "7c183419187073737fa5dbd373e861b3fc25b0df63df655ff3c2faa606266d75  v074-fix.xz" | sha256sum -c -
+          xz -dc v074-fix.xz > v074-fix.patch
+          echo "8ad1bb0e0d02fc89c09ab270c7ed0971fe5554a2f34ef06325c57877422c6c73  v074-fix.patch" | sha256sum -c -
+          cd dacha-v070-project
+          git apply ../v074-fix.patch
 
       - name: Validate fixed source
         shell: bash
@@ -113,15 +124,23 @@ jobs:
           grep -Fq 'id="confirmDialog"' "$R/app/src/main/assets/www/index.html"
           ! grep -Fq 'confirm(' "$R/app/src/main/assets/www/app.js"
           grep -Fq 'id="@+id/widget_row_complete"' "$R/app/src/main/res/layout/dacha_today_widget_row.xml"
-          grep -Fq 'COMMAND_COMPLETE_TASK' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaTodayWidgetProvider.java"
-          grep -Fq 'completeTaskFromWidget' "$R/app/src/main/java/ru/dachafibonacci/manager/data/RoomStore.java"
+          grep -Fq 'COMMAND_COMPLETE_ITEM' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaTodayWidgetProvider.java"
+          grep -Fq 'EXTRA_ITEM_STORE' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaTodayWidgetService.java"
+          grep -Fq '"shopping",' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaTodayWidgetService.java"
+          grep -Fq 'completeItemFromWidget' "$R/app/src/main/java/ru/dachafibonacci/manager/data/RoomStore.java"
+          grep -Fq '"tasks".equals(storeName) && !"shopping".equals(storeName)' "$R/app/src/main/java/ru/dachafibonacci/manager/data/RoomStore.java"
           grep -Fq '.put("status", "pending")' "$R/app/src/main/java/ru/dachafibonacci/manager/data/RoomStore.java"
           grep -Fq 'sendTestNotification' "$R/app/src/main/java/ru/dachafibonacci/manager/NotificationScheduler.java"
           grep -Fq 'areNotificationsEnabled()' "$R/app/src/main/java/ru/dachafibonacci/manager/NotificationScheduler.java"
           grep -Fq 'id="testNotificationButton"' "$R/app/src/main/assets/www/index.html"
           grep -Fq 'onAppResume() { refreshData(); queueSync(250);' "$R/app/src/main/assets/www/app.js"
-          grep -Fq "versionName '0.7.3'" "$R/app/build.gradle"
-          grep -Fq "versionCode 13" "$R/app/build.gradle"
+          grep -Fq 'android:label="Наш мир"' "$R/app/src/main/AndroidManifest.xml"
+          grep -Fq '<title>Наш мир</title>' "$R/app/src/main/assets/www/index.html"
+          grep -Fq "versionName '0.7.4'" "$R/app/build.gradle"
+          grep -Fq "versionCode 14" "$R/app/build.gradle"
+          echo "61b93e2ea570a1db9eb88b93d21e4277de4198dd45f1fd0968cbae521cde4142  $R/app/src/main/assets/www/icons/icon-512.png" | sha256sum -c -
+          echo "e6264bb81f0f1adc8be00bd88b4906d1c5cf08d8e693fb10d3a62791f9aad9f8  $R/app/src/main/assets/www/icons/icon-192.png" | sha256sum -c -
+          echo "61b93e2ea570a1db9eb88b93d21e4277de4198dd45f1fd0968cbae521cde4142  $R/app/src/main/res/drawable/app_icon.png" | sha256sum -c -
 
       - uses: actions/setup-java@v4
         with:
@@ -149,26 +168,27 @@ jobs:
           set -euo pipefail
           DEBUG=dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
           RELEASE=dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
-          ALIGNED=dacha-v070-project/app/build/outputs/apk/release/dacha-fibonacci-v073-aligned-unsigned.apk
+          ALIGNED=dacha-v070-project/app/build/outputs/apk/release/nash-mir-v074-aligned-unsigned.apk
           test -s "$DEBUG"
           test -s "$RELEASE"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -f -p 4 "$RELEASE" "$ALIGNED"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -p -v 4 "$ALIGNED" > fixed-release-alignment.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$DEBUG" > fixed-badging.txt
           grep -Fq "package: name='ru.dachafibonacci.manager'" fixed-badging.txt
-          grep -Fq "versionName='0.7.3'" fixed-badging.txt
-          grep -Fq "versionCode='13'" fixed-badging.txt
+          grep -Fq "versionName='0.7.4'" fixed-badging.txt
+          grep -Fq "versionCode='14'" fixed-badging.txt
+          grep -Fq "application-label:'Наш мир'" fixed-badging.txt
           grep -Fq 'Verification successful' fixed-release-alignment.txt
           cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" apksigner.jar
           sha256sum "$DEBUG" "$RELEASE" "$ALIGNED" apksigner.jar > fixed-sha256.txt
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dacha-fibonacci-v073-notifications-widget-actions
+          name: nash-mir-v074-shopping-widget-action
           path: |
             dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
             dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
-            dacha-v070-project/app/build/outputs/apk/release/dacha-fibonacci-v073-aligned-unsigned.apk
+            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v074-aligned-unsigned.apk
             apksigner.jar
             fixed-badging.txt
             fixed-sha256.txt
