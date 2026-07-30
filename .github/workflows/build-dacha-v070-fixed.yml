@@ -1,4 +1,4 @@
-name: Build Nash Mir v0.8.1 prepayment flow
+name: Build Nash Mir v0.8.2 arrival checklist
 
 on:
   pull_request:
@@ -124,6 +124,17 @@ jobs:
           echo "5e1d3e4aa496fa4a58ce421a06758408452e22cb3f1d935f7a54df5eb389c8d7  v081-fix.patch" | sha256sum -c -
           cd dacha-v070-project
           git apply ../v081-fix.patch
+          cd ..
+
+          cat v082-arrival-checklist-b64/part-00 > v082-fix.xz.b64
+          test "$(wc -c < v082-fix.xz.b64)" -eq 9424
+          echo "d0315f731d7b1eb983d1bddba44243061fb687d2269b93092dd303e8460b39a7  v082-fix.xz.b64" | sha256sum -c -
+          base64 -d v082-fix.xz.b64 > v082-fix.xz
+          echo "6f0fabe8d314072a1c60239929c15c5d0cfc98bdc6c35085be14d78884860aa9  v082-fix.xz" | sha256sum -c -
+          xz -dc v082-fix.xz > v082-fix.patch
+          echo "e6d4f0aa3d9086a76d2a091a2f2646d40650c3e923e78a4ac17c6f224f7eb889  v082-fix.patch" | sha256sum -c -
+          cd dacha-v070-project
+          git apply ../v082-fix.patch
 
       - name: Validate fixed source
         shell: bash
@@ -169,11 +180,17 @@ jobs:
           grep -Fq 'prepaymentAllToPlatform' "$R/app/src/main/assets/www/app.js"
           grep -Fq 'prepaymentPlatformAmount' "$R/app/src/main/assets/www/app.js"
           grep -Fq 'Осталось взять с гостя' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'const ARRIVAL_CHECKLIST' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'Отправить гостю все сообщения в чат' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'Проверить всё перед заездом' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'data-checklist-item' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'function ensureArrivalWorkflowTasks' "$R/app/src/main/assets/www/app.js"
+          grep -Fq '.arrival-checklist' "$R/app/src/main/assets/www/styles.css"
           grep -Fq 'accommodationAmount' "$R/app/src/main/assets/www/app.js"
           grep -Fq 'data-open-payment-for' "$R/app/src/main/assets/www/app.js"
           grep -Fq '.booking-calendar-day.booked' "$R/app/src/main/assets/www/styles.css"
-          grep -Fq "versionName '0.8.1'" "$R/app/build.gradle"
-          grep -Fq "versionCode 16" "$R/app/build.gradle"
+          grep -Fq "versionName '0.8.2'" "$R/app/build.gradle"
+          grep -Fq "versionCode 17" "$R/app/build.gradle"
           echo "61b93e2ea570a1db9eb88b93d21e4277de4198dd45f1fd0968cbae521cde4142  $R/app/src/main/assets/www/icons/icon-512.png" | sha256sum -c -
           echo "e6264bb81f0f1adc8be00bd88b4906d1c5cf08d8e693fb10d3a62791f9aad9f8  $R/app/src/main/assets/www/icons/icon-192.png" | sha256sum -c -
           echo "61b93e2ea570a1db9eb88b93d21e4277de4198dd45f1fd0968cbae521cde4142  $R/app/src/main/res/drawable/app_icon.png" | sha256sum -c -
@@ -204,15 +221,15 @@ jobs:
           set -euo pipefail
           DEBUG=dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
           RELEASE=dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
-          ALIGNED=dacha-v070-project/app/build/outputs/apk/release/nash-mir-v081-aligned-unsigned.apk
+          ALIGNED=dacha-v070-project/app/build/outputs/apk/release/nash-mir-v082-aligned-unsigned.apk
           test -s "$DEBUG"
           test -s "$RELEASE"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -f -p 4 "$RELEASE" "$ALIGNED"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -p -v 4 "$ALIGNED" > fixed-release-alignment.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$DEBUG" > fixed-badging.txt
           grep -Fq "package: name='ru.dachafibonacci.manager'" fixed-badging.txt
-          grep -Fq "versionName='0.8.1'" fixed-badging.txt
-          grep -Fq "versionCode='16'" fixed-badging.txt
+          grep -Fq "versionName='0.8.2'" fixed-badging.txt
+          grep -Fq "versionCode='17'" fixed-badging.txt
           grep -Fq "application-label:'Наш мир'" fixed-badging.txt
           grep -Fq 'Verification successful' fixed-release-alignment.txt
           cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" apksigner.jar
@@ -220,11 +237,11 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: nash-mir-v081-prepayment-flow
+          name: nash-mir-v082-arrival-checklist
           path: |
             dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
             dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
-            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v081-aligned-unsigned.apk
+            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v082-aligned-unsigned.apk
             apksigner.jar
             fixed-badging.txt
             fixed-sha256.txt
