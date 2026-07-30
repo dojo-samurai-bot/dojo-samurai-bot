@@ -1,4 +1,4 @@
-name: Build Nash Mir v0.7.4 shopping widget action
+name: Build Nash Mir v0.8.0 booking calendar
 
 on:
   pull_request:
@@ -102,6 +102,17 @@ jobs:
           echo "8ad1bb0e0d02fc89c09ab270c7ed0971fe5554a2f34ef06325c57877422c6c73  v074-fix.patch" | sha256sum -c -
           cd dacha-v070-project
           git apply ../v074-fix.patch
+          cd ..
+
+          cat v080-booking-calendar-b64/part-{00,01} > v080-fix.xz.b64
+          test "$(wc -c < v080-fix.xz.b64)" -eq 20184
+          echo "ac757c8bd533ee08c40b15a076944b8d301b0f95819898f3c889e1af04fb6ba6  v080-fix.xz.b64" | sha256sum -c -
+          base64 -d v080-fix.xz.b64 > v080-fix.xz
+          echo "223af8b4b9b4fb38c27abb693d915486debdba313f43cbfa06375498fb2f994d  v080-fix.xz" | sha256sum -c -
+          xz -dc v080-fix.xz > v080-fix.patch
+          echo "8c02783dbe5dcfbf8964eef782b4d33dbdf2f1f99d5a6a25d50a24a702606993  v080-fix.patch" | sha256sum -c -
+          cd dacha-v070-project
+          git apply ../v080-fix.patch
 
       - name: Validate fixed source
         shell: bash
@@ -111,6 +122,7 @@ jobs:
           node --check "$R/app/src/main/assets/www/app.js"
           node --check "$R/app/src/main/assets/www/db.js"
           node --check "$R/app/src/main/assets/www/sync.js"
+          node --check "$R/app/src/main/assets/www/sw.js"
           grep -Fq 'SCHEDULE_EXACT_ALARM' "$R/app/src/main/AndroidManifest.xml"
           grep -Fq 'setExactAndAllowWhileIdle' "$R/app/src/main/java/ru/dachafibonacci/manager/NotificationScheduler.java"
           grep -Fq '.commit();' "$R/app/src/main/java/ru/dachafibonacci/manager/data/WidgetSnapshotRepository.java"
@@ -136,8 +148,17 @@ jobs:
           grep -Fq 'onAppResume() { refreshData(); queueSync(250);' "$R/app/src/main/assets/www/app.js"
           grep -Fq 'android:label="Наш мир"' "$R/app/src/main/AndroidManifest.xml"
           grep -Fq '<title>Наш мир</title>' "$R/app/src/main/assets/www/index.html"
-          grep -Fq "versionName '0.7.4'" "$R/app/build.gradle"
-          grep -Fq "versionCode 14" "$R/app/build.gradle"
+          grep -Fq 'function renderBookingCalendar' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'function bookingRangeConflict' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'Дата выезда считается занятой полностью' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'paymentStatuses:' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'function transactionIsCashIncome' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'prepaymentRecipient' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'accommodationAmount' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'data-open-payment-for' "$R/app/src/main/assets/www/app.js"
+          grep -Fq '.booking-calendar-day.booked' "$R/app/src/main/assets/www/styles.css"
+          grep -Fq "versionName '0.8.0'" "$R/app/build.gradle"
+          grep -Fq "versionCode 15" "$R/app/build.gradle"
           echo "61b93e2ea570a1db9eb88b93d21e4277de4198dd45f1fd0968cbae521cde4142  $R/app/src/main/assets/www/icons/icon-512.png" | sha256sum -c -
           echo "e6264bb81f0f1adc8be00bd88b4906d1c5cf08d8e693fb10d3a62791f9aad9f8  $R/app/src/main/assets/www/icons/icon-192.png" | sha256sum -c -
           echo "61b93e2ea570a1db9eb88b93d21e4277de4198dd45f1fd0968cbae521cde4142  $R/app/src/main/res/drawable/app_icon.png" | sha256sum -c -
@@ -168,15 +189,15 @@ jobs:
           set -euo pipefail
           DEBUG=dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
           RELEASE=dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
-          ALIGNED=dacha-v070-project/app/build/outputs/apk/release/nash-mir-v074-aligned-unsigned.apk
+          ALIGNED=dacha-v070-project/app/build/outputs/apk/release/nash-mir-v080-aligned-unsigned.apk
           test -s "$DEBUG"
           test -s "$RELEASE"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -f -p 4 "$RELEASE" "$ALIGNED"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -p -v 4 "$ALIGNED" > fixed-release-alignment.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$DEBUG" > fixed-badging.txt
           grep -Fq "package: name='ru.dachafibonacci.manager'" fixed-badging.txt
-          grep -Fq "versionName='0.7.4'" fixed-badging.txt
-          grep -Fq "versionCode='14'" fixed-badging.txt
+          grep -Fq "versionName='0.8.0'" fixed-badging.txt
+          grep -Fq "versionCode='15'" fixed-badging.txt
           grep -Fq "application-label:'Наш мир'" fixed-badging.txt
           grep -Fq 'Verification successful' fixed-release-alignment.txt
           cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" apksigner.jar
@@ -184,11 +205,11 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: nash-mir-v074-shopping-widget-action
+          name: nash-mir-v080-booking-calendar
           path: |
             dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
             dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
-            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v074-aligned-unsigned.apk
+            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v080-aligned-unsigned.apk
             apksigner.jar
             fixed-badging.txt
             fixed-sha256.txt
