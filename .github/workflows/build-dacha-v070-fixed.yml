@@ -1,4 +1,4 @@
-name: Build Nash Mir v0.9.1 guest deduplication
+name: Build Nash Mir v0.9.2 booking discount
 
 on:
   pull_request:
@@ -151,6 +151,13 @@ jobs:
           echo "aba024e354528c14ac1a12ca499d2c1f158ecfec3ae6da0572b7582e514a54de  v091-files.tar.xz" | sha256sum -c -
           tar -xJf v091-files.tar.xz -C dacha-v070-project
 
+          cat v092-booking-discount-b64/part-{00,01} > v092-files.tar.xz.b64
+          test "$(wc -c < v092-files.tar.xz.b64)" -eq 64855
+          echo "3faf7047515a3011856b56c566cb4fbbab4da8b8fece30df0427968e81d6161a  v092-files.tar.xz.b64" | sha256sum -c -
+          base64 -d v092-files.tar.xz.b64 > v092-files.tar.xz
+          echo "ed622bec37fc5f9e74394f203be8432d9d342109125dfc00c088c42d830a2f50  v092-files.tar.xz" | sha256sum -c -
+          tar -xJf v092-files.tar.xz -C dacha-v070-project
+
       - name: Validate fixed source
         shell: bash
         run: |
@@ -204,14 +211,17 @@ jobs:
           grep -Fq 'accommodationAmount' "$R/app/src/main/assets/www/app.js"
           grep -Fq 'data-open-payment-for' "$R/app/src/main/assets/www/app.js"
           grep -Fq '.booking-calendar-day.booked' "$R/app/src/main/assets/www/styles.css"
-          grep -Fq "versionName '0.9.1'" "$R/app/build.gradle"
-          grep -Fq "versionCode 19" "$R/app/build.gradle"
+          grep -Fq "versionName '0.9.2'" "$R/app/build.gradle"
+          grep -Fq "versionCode 20" "$R/app/build.gradle"
           grep -Fq "'guests'" "$R/app/src/main/assets/www/db.js"
           grep -Fq "function renderGuests" "$R/app/src/main/assets/www/app.js"
           grep -Fq "function migrateBookingGuests" "$R/app/src/main/assets/www/app.js"
           grep -Fq "function normalizePhone" "$R/app/src/main/assets/www/app.js"
           grep -Fq "function migratedGuestId" "$R/app/src/main/assets/www/app.js"
           grep -Fq "function consolidateGuestDuplicates" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "function bookingDiscountAmount" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "discountPercent" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "Скидка гостю, %" "$R/app/src/main/assets/www/app.js"
           grep -Fq "financeSettings" "$R/app/src/main/assets/www/app.js"
           grep -Fq "premiumOffers" "$R/app/src/main/assets/www/app.js"
           grep -Fq "'guests'" "$R/server/apps-script/Code.gs"
@@ -245,15 +255,15 @@ jobs:
           set -euo pipefail
           DEBUG=dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
           RELEASE=dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
-          ALIGNED=dacha-v070-project/app/build/outputs/apk/release/nash-mir-v091-aligned-unsigned.apk
+          ALIGNED=dacha-v070-project/app/build/outputs/apk/release/nash-mir-v092-aligned-unsigned.apk
           test -s "$DEBUG"
           test -s "$RELEASE"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -f -p 4 "$RELEASE" "$ALIGNED"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -p -v 4 "$ALIGNED" > fixed-release-alignment.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$DEBUG" > fixed-badging.txt
           grep -Fq "package: name='ru.dachafibonacci.manager'" fixed-badging.txt
-          grep -Fq "versionName='0.9.1'" fixed-badging.txt
-          grep -Fq "versionCode='19'" fixed-badging.txt
+          grep -Fq "versionName='0.9.2'" fixed-badging.txt
+          grep -Fq "versionCode='20'" fixed-badging.txt
           grep -Fq "application-label:'Наш мир'" fixed-badging.txt
           grep -Fq 'Verification successful' fixed-release-alignment.txt
           cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" apksigner.jar
@@ -261,11 +271,11 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: nash-mir-v091-guest-dedupe
+          name: nash-mir-v092-booking-discount
           path: |
             dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
             dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
-            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v091-aligned-unsigned.apk
+            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v092-aligned-unsigned.apk
             apksigner.jar
             fixed-badging.txt
             fixed-sha256.txt
