@@ -1,4 +1,4 @@
-name: Build Nash Mir v0.10.0 focused widgets
+name: Build Nash Mir v0.10.1 sync reliability
 
 on:
   pull_request:
@@ -172,6 +172,13 @@ jobs:
           echo "30d6cfdaf7ec9869edd4af348061ce953de9a5d5d69dcd65c19a69078c080513  v100-files.tar.xz" | sha256sum -c -
           tar -xJf v100-files.tar.xz -C dacha-v070-project
 
+          cat v101-sync-reliability-b64/part-{00,01} > v101-files.tar.xz.b64
+          test "$(wc -c < v101-files.tar.xz.b64)" -eq 60384
+          echo "a0deaede63bda358de909f6dbb5f9fbd98acbd6a924efae7827e49b4eed4ba0f  v101-files.tar.xz.b64" | sha256sum -c -
+          base64 -d v101-files.tar.xz.b64 > v101-files.tar.xz
+          echo "564aa811a0edc70fef392a1ec859733f6668f4bd350212c8c1bae0fbc39dabb4  v101-files.tar.xz" | sha256sum -c -
+          tar -xJf v101-files.tar.xz -C dacha-v070-project
+
       - name: Validate fixed source
         shell: bash
         run: |
@@ -188,7 +195,7 @@ jobs:
           grep -Fq "task.repeat === 'weekly'" "$R/app/src/main/assets/www/app.js"
           grep -Fq 'syncRequest(String requestId, String endpoint, String requestJson)' "$R/app/src/main/java/ru/dachafibonacci/manager/WidgetBridge.java"
           grep -Fq "window.AndroidBridge.syncRequest" "$R/app/src/main/assets/www/sync.js"
-          grep -Fq "if (status == 301 || status == 302 || status == 303) sendPostBody = false;" "$R/app/src/main/java/ru/dachafibonacci/manager/WidgetBridge.java"
+          grep -Fq 'sendPostBody = false;' "$R/app/src/main/java/ru/dachafibonacci/manager/WidgetBridge.java"
           grep -Fq 'window.DachaNativeSync' "$R/app/src/main/assets/www/sync.js"
           grep -Fq '.detail-dialog[open] { display: flex; flex-direction: column; }' "$R/app/src/main/assets/www/styles.css"
           grep -Fq 'id="confirmDialog"' "$R/app/src/main/assets/www/index.html"
@@ -225,8 +232,13 @@ jobs:
           grep -Fq 'accommodationAmount' "$R/app/src/main/assets/www/app.js"
           grep -Fq 'data-open-payment-for' "$R/app/src/main/assets/www/app.js"
           grep -Fq '.booking-calendar-day.booked' "$R/app/src/main/assets/www/styles.css"
-          grep -Fq "versionName '0.10.0'" "$R/app/build.gradle"
-          grep -Fq "versionCode 23" "$R/app/build.gradle"
+          grep -Fq "versionName '0.10.1'" "$R/app/build.gradle"
+          grep -Fq "versionCode 24" "$R/app/build.gradle"
+          grep -Fq 'resolveVersionConflict' "$R/app/src/main/assets/www/sync.js"
+          grep -Fq 'recoverStoredConflicts' "$R/app/src/main/assets/www/sync.js"
+          grep -Fq 'refreshGuestBookingMirrors' "$R/app/src/main/assets/www/sync.js"
+          grep -Fq 'redirect < 15' "$R/app/src/main/java/ru/dachafibonacci/manager/WidgetBridge.java"
+          grep -Fq 'CookieManager' "$R/app/src/main/java/ru/dachafibonacci/manager/WidgetBridge.java"
           grep -Fq "'guests'" "$R/app/src/main/assets/www/db.js"
           grep -Fq "function renderGuests" "$R/app/src/main/assets/www/app.js"
           grep -Fq "function migrateBookingGuests" "$R/app/src/main/assets/www/app.js"
@@ -281,15 +293,15 @@ jobs:
           set -euo pipefail
           DEBUG=dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
           RELEASE=dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
-          ALIGNED=dacha-v070-project/app/build/outputs/apk/release/nash-mir-v100-aligned-unsigned.apk
+          ALIGNED=dacha-v070-project/app/build/outputs/apk/release/nash-mir-v101-aligned-unsigned.apk
           test -s "$DEBUG"
           test -s "$RELEASE"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -f -p 4 "$RELEASE" "$ALIGNED"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -p -v 4 "$ALIGNED" > fixed-release-alignment.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$DEBUG" > fixed-badging.txt
           grep -Fq "package: name='ru.dachafibonacci.manager'" fixed-badging.txt
-          grep -Fq "versionName='0.10.0'" fixed-badging.txt
-          grep -Fq "versionCode='23'" fixed-badging.txt
+          grep -Fq "versionName='0.10.1'" fixed-badging.txt
+          grep -Fq "versionCode='24'" fixed-badging.txt
           grep -Fq "application-label:'Наш мир'" fixed-badging.txt
           grep -Fq 'Verification successful' fixed-release-alignment.txt
           cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" apksigner.jar
@@ -297,11 +309,11 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: nash-mir-v100-focused-widgets
+          name: nash-mir-v101-sync-reliability
           path: |
             dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
             dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
-            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v100-aligned-unsigned.apk
+            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v101-aligned-unsigned.apk
             apksigner.jar
             fixed-badging.txt
             fixed-sha256.txt
