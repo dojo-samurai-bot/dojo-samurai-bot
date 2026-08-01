@@ -1,0 +1,112 @@
+ing: 'booking', shopping: 'shopping' };
++      const formMap = { task: 'task', idea: 'idea', income: 'income', expense: 'expense', booking: 'booking', shopping: 'shopping' };
+       if (formMap[action]) { openForm(formMap[action]); return true; }
+       if (action === 'shopping-list') { navigate('shopping'); return true; }
+       if (VALID_PAGES.includes(action)) { navigate(action); return true; }
+@@ -1541,7 +1603,7 @@
+       try { await navigator.serviceWorker.register('./sw.js'); } catch (error) { console.warn('Service worker registration failed', error); }
+     }
+     const migrated = await migrateLegacyAndroidData();
+-    for (const store of ['tasks', 'shopping', 'bookings', 'transactions', 'settings']) state.data[store] = await DB.getAll(store);
++    for (const store of ['tasks', 'shopping', 'bookings', 'transactions', 'ideas', 'settings']) state.data[store] = await DB.getAll(store);
+     applyInterfaceScale();
+     refreshNotificationSettings();
+     startSyncPolling();
+diff --git a/app/src/main/assets/www/db.js b/app/src/main/assets/www/db.js
+index 95849cf..46ad414 100644
+--- a/app/src/main/assets/www/db.js
++++ b/app/src/main/assets/www/db.js
+@@ -2,8 +2,8 @@
+   'use strict';
+ 
+   const DB_NAME = 'dacha-fibonacci-db';
+-  const DB_VERSION = 1;
+-  const STORES = ['tasks', 'shopping', 'bookings', 'transactions', 'settings'];
++  const DB_VERSION = 2;
++  const STORES = ['tasks', 'shopping', 'bookings', 'transactions', 'ideas', 'settings'];
+   let dbPromise;
+ 
+   function assertStore(storeName) {
+@@ -89,13 +89,13 @@
+   }
+ 
+   async function exportAll() {
+-    const output = { version: 1, app: 'dacha-fibonacci', exportedAt: new Date().toISOString(), data: {} };
++    const output = { version: 2, app: 'dacha-fibonacci', exportedAt: new Date().toISOString(), data: {} };
+     for (const store of STORES) output.data[store] = await getAll(store);
+     return output;
+   }
+ 
+   function validatePayload(payload) {
+-    if (!payload || payload.version !== 1 || !payload.data || typeof payload.data !== 'object') throw new Error('Неподдерживаемый формат копии');
++    if (!payload || ![1, 2].includes(Number(payload.version)) || !payload.data || typeof payload.data !== 'object') throw new Error('Неподдерживаемый формат копии');
+     for (const store of STORES) {
+       const records = payload.data[store] || [];
+       if (!Array.isArray(records)) throw new Error(`Повреждён раздел копии: ${store}`);
+diff --git a/app/src/main/assets/www/index.html b/app/src/main/assets/www/index.html
+index 3df5077..d1c3dec 100644
+--- a/app/src/main/assets/www/index.html
++++ b/app/src/main/assets/www/index.html
+@@ -109,7 +109,7 @@
+           <input id="newTaskCategory" maxlength="40" placeholder="Новая категория" />
+           <button id="addTaskCategory" class="button secondary" type="button">Добавить</button>
+         </div>
+-        <p class="sync-note">Категории синхронизируются через общий файл. Удаление категории не удаляет дела и не стирает старое название.</p>
++        <p class="sync-note">Категории будут синхронизироваться через общую базу. Удаление категории не удаляет дела и не стирает старое название.</p>
+       </section>
+       <section class="settings-section notification-section">
+         <h3>Уведомления</h3>
+@@ -153,7 +153,7 @@
+         <button id="demoDataButton" class="button secondary" type="button">Добавить демонстрационные данные</button>
+         <button id="clearDataButton" class="button danger" type="button">Удалить все данные</button>
+       </section>
+-      <p class="version-line">Версия 0.6.1 · Android/WebView</p>
++      <p class="version-line">Версия 0.7.0 · Android / Windows / macOS</p>
+     </div>
+   </dialog>
+ 
+diff --git a/app/src/main/assets/www/manifest.webmanifest b/app/src/main/assets/www/manifest.webmanifest
+index b82b9bf..c86dd26 100644
+--- a/app/src/main/assets/www/manifest.webmanifest
++++ b/app/src/main/assets/www/manifest.webmanifest
+@@ -1,7 +1,7 @@
+ {
+   "name": "Дача Фибоначчи — управление",
+   "short_name": "Дача Фибоначчи",
+-  "description": "Задачи, покупки, бронирования и финансы домика",
++  "description": "Задачи, идеи, покупки, бронирования и финансы домика",
+   "lang": "ru",
+   "start_url": "./index.html",
+   "scope": "./",
+diff --git a/app/src/main/assets/www/styles.css b/app/src/main/assets/www/styles.css
+index 3c380cb..affc350 100644
+--- a/app/src/main/assets/www/styles.css
++++ b/app/src/main/assets/www/styles.css
+@@ -311,3 +311,17 @@ html[data-ui-scale="micro"] .transaction-icon { width: 32px; height: 32px; borde
+ .danger-icon:disabled { opacity: .35; cursor: default; }
+ .category-add-row { margin-top: 10px; }
+ .category-add-row .button { flex: 0 0 auto; }
++
++
++/* v0.7 ideas jar — visible only inside the Tasks page */
++.task-side-stack { display: grid; gap: 16px; align-items: start; }
++.ideas-card { overflow: hidden; }
++.ideas-card .eyebrow { margin: 0 0 3px; }
++.idea-list { max-height: 330px; overflow-y: auto; padding-right: 2px; scrollbar-width: thin; }
++.idea-item { align-items: flex-start; }
++.idea-bullet { width: 28px; height: 28px; flex: 0 0 28px; border-radius: 10px; display: grid; place-items: center; background: rgba(207, 184, 139, .20); color: var(--green-dark); font-size: 14px; }
++.idea-add { margin-top: 12px; }
++.idea-add input { min-width: 0; }
++@media (min-width: 1050px) {
++  .task-layout { grid-template-columns: minmax(0, 1fr) 340px; }
++}
+diff --git a/app/src/main/assets/www/sw.js b/app/src/main/assets/www/sw.js
+index 3ef80a6..923e881 100644
+--- a/app/src/main/assets/www/sw.js
++++ b/app/src/main/assets/www/sw.js
+@@ -1,4 +1,4 @@
+-const CACHE = 'dacha-fibonacci-v0.6.0';
++const CACHE = 'dacha-fibonacci-v0.7.0';
+ const ASSETS = [
+   './', './index.html', './styles.css', './db.js', './app.js', './manifest.webmanifest',
+   './icons/icon-192.png', './icons/icon-512.png'
