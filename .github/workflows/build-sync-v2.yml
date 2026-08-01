@@ -74,9 +74,9 @@ jobs:
           grep -Fq 'resolveConflictRow' "$R/server/apps-script/Code.gs"
           grep -Fq 'id="syncConflictList"' "$W/index.html"
           grep -Fq 'renderSyncConflicts' "$W/app.js"
-          grep -Fq 'protocolVersion: 2' "$W/sync.js"
-          grep -Fq 'receivedServerSequence' "$W/sync.js"
-          grep -Fq 'appliedServerSequence' "$W/sync.js"
+          grep -Fq 'protocolVersion: PROTOCOL_VERSION' "$W/sync.js"
+          grep -Fq 'receivedSequence' "$W/sync.js"
+          grep -Fq 'appliedSequence' "$W/sync.js"
           grep -Fq 'nextAttemptAt' "$W/sync.js"
           grep -Fq 'createDailyBackup' "$R/server/apps-script/Code.gs"
 
