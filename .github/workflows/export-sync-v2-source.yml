@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/sync-v2-offline-first
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
