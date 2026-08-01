@@ -50,6 +50,13 @@ jobs:
           echo "fee19c8f8251a69b2f48feb1625498a767c769e227cab40b32073610c529fef3  sync-v2-overlay.tar.xz" | sha256sum -c -
           tar -xJf sync-v2-overlay.tar.xz -C dacha-v070-project
 
+          cat sync-v2-test-package-b64/part-00 > sync-v2-test-package.tar.xz.b64
+          test "$(wc -c < sync-v2-test-package.tar.xz.b64)" -eq 1144
+          echo "b006a5610a7c68dccf3c49aa8b3a8c2dac60cf7a383ac0906fbccea4a61e6d68  sync-v2-test-package.tar.xz.b64" | sha256sum -c -
+          base64 -d sync-v2-test-package.tar.xz.b64 > sync-v2-test-package.tar.xz
+          echo "ad57dec1cc1585abaedc6a7a37fea9f62ceabe3d373a37b7b46162e2aff4f281  sync-v2-test-package.tar.xz" | sha256sum -c -
+          tar -xJf sync-v2-test-package.tar.xz -C dacha-v070-project
+
       - name: Validate sync v2 source and protocol
         shell: bash
         run: |
@@ -66,6 +73,8 @@ jobs:
           node "$R/server/tests/sync-v2.test.js" "$R/server/apps-script/Code.gs"
           grep -Fq "versionName '0.11.0-sync2'" "$R/app/build.gradle"
           grep -Fq "versionCode 27" "$R/app/build.gradle"
+          grep -Fq "applicationIdSuffix '.sync2test'" "$R/app/build.gradle"
+          grep -Fq 'Наш мир Sync Test' "$R/app/src/debug/AndroidManifest.xml"
           grep -Fq 'commit(JSONObject mutations)' "$J/data/RoomStore.java"
           grep -Fq 'case "commit"' "$J/data/NativeDatabaseBridge.java"
           grep -Fq "'inbox'" "$W/db.js"
@@ -117,10 +126,10 @@ jobs:
           "$ZIPALIGN" -f -p 4 "$RELEASE" "$ALIGNED"
           "$ZIPALIGN" -c -p -v 4 "$ALIGNED" > sync-v2-release-alignment.txt
           "$AAPT" dump badging "$DEBUG" > sync-v2-badging.txt
-          grep -Fq "package: name='ru.dachafibonacci.manager'" sync-v2-badging.txt
+          grep -Fq "package: name='ru.dachafibonacci.manager.sync2test'" sync-v2-badging.txt
           grep -Fq "versionCode='27'" sync-v2-badging.txt
-          grep -Fq "versionName='0.11.0-sync2'" sync-v2-badging.txt
-          grep -Fq "application-label:'Наш мир'" sync-v2-badging.txt
+          grep -Fq "versionName='0.11.0-sync2-test'" sync-v2-badging.txt
+          grep -Fq "application-label:'Наш мир Sync Test'" sync-v2-badging.txt
           grep -Fq 'Verification successful' sync-v2-release-alignment.txt
           cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" apksigner.jar
           tar --exclude='.git' --exclude='.gradle' --exclude='*/build' \
@@ -130,7 +139,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: nash-mir-v0110-sync-v2-test
+          name: nash-mir-v0110-sync-v2-side-by-side-test
           path: |
             dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
             dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
