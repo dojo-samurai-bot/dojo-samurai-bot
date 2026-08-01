@@ -1,0 +1,146 @@
+name: Build Nash Mir sync v2 test
+
+on:
+  push:
+    branches:
+      - agent/sync-v2-offline-first
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-sync-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct Nash Mir 0.10.3 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('.github/workflows/build-dacha-v070-fixed.yml').read_text().splitlines()
+          start_marker = '      - name: Reconstruct source and apply all patches'
+          end_marker = '      - name: Validate fixed source'
+          start = source.index(start_marker)
+          end = source.index(end_marker)
+          run_line = next(i for i in range(start, end) if source[i].strip() == 'run: |')
+          body = source[run_line + 1:end]
+          indent = min(len(line) - len(line.lstrip()) for line in body if line.strip())
+          script = '\n'.join(line[indent:] if line.strip() else '' for line in body) + '\n'
+          Path('/tmp/reconstruct-latest.sh').write_text('set -euo pipefail\n' + script)
+          PY
+          bash /tmp/reconstruct-latest.sh
+
+      - name: Apply sync v2 implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat sync-v2-implementation-b64/part-{00,01,02,03,04,05} > sync-v2-overlay.tar.xz.b64
+          test "$(wc -c < sync-v2-overlay.tar.xz.b64)" -eq 91228
+          echo "37072616c83e73ff83e95459209682d170273291dcf2fe15876a00f3cbaf52d1  sync-v2-overlay.tar.xz.b64" | sha256sum -c -
+          base64 -d sync-v2-overlay.tar.xz.b64 > sync-v2-overlay.tar.xz
+          echo "fee19c8f8251a69b2f48feb1625498a767c769e227cab40b32073610c529fef3  sync-v2-overlay.tar.xz" | sha256sum -c -
+          tar -xJf sync-v2-overlay.tar.xz -C dacha-v070-project
+
+      - name: Validate sync v2 source and protocol
+        shell: bash
+        run: |
+          set -euo pipefail
+          R=dacha-v070-project
+          W=$R/app/src/main/assets/www
+          J=$R/app/src/main/java/ru/dachafibonacci/manager
+          node --check "$W/app.js"
+          node --check "$W/db.js"
+          node --check "$W/sync.js"
+          node --check "$W/sw.js"
+          cp "$R/server/apps-script/Code.gs" /tmp/Code.js
+          node --check /tmp/Code.js
+          node "$R/server/tests/sync-v2.test.js" "$R/server/apps-script/Code.gs"
+          grep -Fq "versionName '0.11.0-sync2'" "$R/app/build.gradle"
+          grep -Fq "versionCode 27" "$R/app/build.gradle"
+          grep -Fq 'commit(JSONObject mutations)' "$J/data/RoomStore.java"
+          grep -Fq 'case "commit"' "$J/data/NativeDatabaseBridge.java"
+          grep -Fq "'inbox'" "$W/db.js"
+          grep -Fq "'tombstones'" "$W/db.js"
+          grep -Fq 'computeMergeDecision' "$R/server/apps-script/Code.gs"
+          grep -Fq 'resolveConflictRow' "$R/server/apps-script/Code.gs"
+          grep -Fq 'id="syncConflictList"' "$W/index.html"
+          grep -Fq 'renderSyncConflicts' "$W/app.js"
+          grep -Fq 'protocolVersion: 2' "$W/sync.js"
+          grep -Fq 'receivedServerSequence' "$W/sync.js"
+          grep -Fq 'appliedServerSequence' "$W/sync.js"
+          grep -Fq 'nextAttemptAt' "$W/sync.js"
+          grep -Fq 'createDailyBackup' "$R/server/apps-script/Code.gs"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+
+      - name: Build debug and release APKs
+        shell: bash
+        working-directory: dacha-v070-project
+        run: gradle :app:assembleDebug :app:assembleRelease --stacktrace --no-daemon
+
+      - name: Validate and package artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          R=dacha-v070-project
+          DEBUG=$R/app/build/outputs/apk/debug/app-debug.apk
+          RELEASE=$R/app/build/outputs/apk/release/app-release-unsigned.apk
+          ALIGNED=$R/app/build/outputs/apk/release/nash-mir-v0110-sync-v2-aligned-unsigned.apk
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          ZIPALIGN="$ANDROID_HOME/build-tools/36.0.0/zipalign"
+          test -s "$DEBUG"
+          test -s "$RELEASE"
+          "$ZIPALIGN" -f -p 4 "$RELEASE" "$ALIGNED"
+          "$ZIPALIGN" -c -p -v 4 "$ALIGNED" > sync-v2-release-alignment.txt
+          "$AAPT" dump badging "$DEBUG" > sync-v2-badging.txt
+          grep -Fq "package: name='ru.dachafibonacci.manager'" sync-v2-badging.txt
+          grep -Fq "versionCode='27'" sync-v2-badging.txt
+          grep -Fq "versionName='0.11.0-sync2'" sync-v2-badging.txt
+          grep -Fq "application-label:'Наш мир'" sync-v2-badging.txt
+          grep -Fq 'Verification successful' sync-v2-release-alignment.txt
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" apksigner.jar
+          tar --exclude='.git' --exclude='.gradle' --exclude='*/build' \
+            -cJf nash-mir-v0110-sync-v2-editable-source.tar.xz "$R"
+          sha256sum "$DEBUG" "$RELEASE" "$ALIGNED" apksigner.jar \
+            nash-mir-v0110-sync-v2-editable-source.tar.xz > sync-v2-sha256.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nash-mir-v0110-sync-v2-test
+          path: |
+            dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
+            dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
+            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v0110-sync-v2-aligned-unsigned.apk
+            dacha-v070-project/server/apps-script/Code.gs
+            dacha-v070-project/server/tests/sync-v2.test.js
+            nash-mir-v0110-sync-v2-editable-source.tar.xz
+            apksigner.jar
+            sync-v2-badging.txt
+            sync-v2-release-alignment.txt
+            sync-v2-sha256.txt
+          if-no-files-found: error
+          retention-days: 7
