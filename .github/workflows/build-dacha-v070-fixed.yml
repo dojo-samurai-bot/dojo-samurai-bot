@@ -1,4 +1,4 @@
-name: Build Nash Mir v0.10.2 shopping expense
+name: Build Nash Mir v0.10.3 widget footer expense
 
 on:
   pull_request:
@@ -186,6 +186,13 @@ jobs:
           echo "3808bf86c1540afe4d9d158765f0f4b0b7a4213640499dca205dda1ce9ae4c87  v102-files.tar.xz" | sha256sum -c -
           tar -xJf v102-files.tar.xz -C dacha-v070-project
 
+          cat v103-widget-footer-expense-b64/part-{00,01} > v103-files.tar.xz.b64
+          test "$(wc -c < v103-files.tar.xz.b64)" -eq 64760
+          echo "bc8bdf8d3949f5b5716a4cdeb015db372e04016e11aeeb3f3fcfe86be7d386d5  v103-files.tar.xz.b64" | sha256sum -c -
+          base64 -d v103-files.tar.xz.b64 > v103-files.tar.xz
+          echo "7f77e24a9ab84d1ca46b47c8e3ce0c3613bcda80d70bc99a6e70fda7029120ac  v103-files.tar.xz" | sha256sum -c -
+          tar -xJf v103-files.tar.xz -C dacha-v070-project
+
       - name: Validate fixed source
         shell: bash
         run: |
@@ -239,10 +246,11 @@ jobs:
           grep -Fq 'accommodationAmount' "$R/app/src/main/assets/www/app.js"
           grep -Fq 'data-open-payment-for' "$R/app/src/main/assets/www/app.js"
           grep -Fq '.booking-calendar-day.booked' "$R/app/src/main/assets/www/styles.css"
-          grep -Fq "versionName '0.10.2'" "$R/app/build.gradle"
-          grep -Fq "versionCode 25" "$R/app/build.gradle"
-          grep -Fq 'widget_row_expense' "$R/app/src/main/res/layout/dacha_today_widget_row.xml"
-          grep -Fq 'R.id.widget_row_expense' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaTodayWidgetService.java"
+          grep -Fq "versionName '0.10.3'" "$R/app/build.gradle"
+          grep -Fq "versionCode 26" "$R/app/build.gradle"
+          grep -Fq 'widget_today_add_expense' "$R/app/src/main/res/layout/dacha_today_widget.xml"
+          grep -Fq 'R.id.widget_today_add_expense' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaListWidgetProvider.java"
+          ! grep -Fq 'widget_row_expense' "$R/app/src/main/res/layout/dacha_today_widget_row.xml"
           grep -Fq 'resolveVersionConflict' "$R/app/src/main/assets/www/sync.js"
           grep -Fq 'recoverStoredConflicts' "$R/app/src/main/assets/www/sync.js"
           grep -Fq 'refreshGuestBookingMirrors' "$R/app/src/main/assets/www/sync.js"
@@ -302,15 +310,15 @@ jobs:
           set -euo pipefail
           DEBUG=dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
           RELEASE=dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
-          ALIGNED=dacha-v070-project/app/build/outputs/apk/release/nash-mir-v102-aligned-unsigned.apk
+          ALIGNED=dacha-v070-project/app/build/outputs/apk/release/nash-mir-v103-aligned-unsigned.apk
           test -s "$DEBUG"
           test -s "$RELEASE"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -f -p 4 "$RELEASE" "$ALIGNED"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -p -v 4 "$ALIGNED" > fixed-release-alignment.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$DEBUG" > fixed-badging.txt
           grep -Fq "package: name='ru.dachafibonacci.manager'" fixed-badging.txt
-          grep -Fq "versionName='0.10.2'" fixed-badging.txt
-          grep -Fq "versionCode='25'" fixed-badging.txt
+          grep -Fq "versionName='0.10.3'" fixed-badging.txt
+          grep -Fq "versionCode='26'" fixed-badging.txt
           grep -Fq "application-label:'Наш мир'" fixed-badging.txt
           grep -Fq 'Verification successful' fixed-release-alignment.txt
           cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" apksigner.jar
@@ -318,11 +326,11 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: nash-mir-v102-shopping-expense
+          name: nash-mir-v103-widget-footer-expense
           path: |
             dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
             dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
-            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v102-aligned-unsigned.apk
+            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v103-aligned-unsigned.apk
             apksigner.jar
             fixed-badging.txt
             fixed-sha256.txt
