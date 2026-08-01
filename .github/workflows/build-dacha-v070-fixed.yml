@@ -1,4 +1,4 @@
-name: Build Nash Mir v0.9.3 payment confirmation
+name: Build Nash Mir v0.10.0 focused widgets
 
 on:
   pull_request:
@@ -165,6 +165,13 @@ jobs:
           echo "16a5a5b062c03b28b1359f217aff9da034f4e800594474d9bad2ed08ec1174cc  v093-files.tar.xz" | sha256sum -c -
           tar -xJf v093-files.tar.xz -C dacha-v070-project
 
+          cat v100-separate-widgets-b64/part-{00,01} > v100-files.tar.xz.b64
+          test "$(wc -c < v100-files.tar.xz.b64)" -eq 75868
+          echo "c3baeeb6871c83a7e055325735fac8e7c0e52d4ac91e98af389472a39e381ce8  v100-files.tar.xz.b64" | sha256sum -c -
+          base64 -d v100-files.tar.xz.b64 > v100-files.tar.xz
+          echo "30d6cfdaf7ec9869edd4af348061ce953de9a5d5d69dcd65c19a69078c080513  v100-files.tar.xz" | sha256sum -c -
+          tar -xJf v100-files.tar.xz -C dacha-v070-project
+
       - name: Validate fixed source
         shell: bash
         run: |
@@ -187,9 +194,9 @@ jobs:
           grep -Fq 'id="confirmDialog"' "$R/app/src/main/assets/www/index.html"
           ! grep -Fq 'confirm(' "$R/app/src/main/assets/www/app.js"
           grep -Fq 'id="@+id/widget_row_complete"' "$R/app/src/main/res/layout/dacha_today_widget_row.xml"
-          grep -Fq 'COMMAND_COMPLETE_ITEM' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaTodayWidgetProvider.java"
+          grep -Fq 'COMMAND_COMPLETE_ITEM' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaListWidgetProvider.java"
           grep -Fq 'EXTRA_ITEM_STORE' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaTodayWidgetService.java"
-          grep -Fq '"shopping",' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaTodayWidgetService.java"
+          grep -Fq 'MODE_SHOPPING' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaTodayWidgetService.java"
           grep -Fq 'completeItemFromWidget' "$R/app/src/main/java/ru/dachafibonacci/manager/data/RoomStore.java"
           grep -Fq '"tasks".equals(storeName) && !"shopping".equals(storeName)' "$R/app/src/main/java/ru/dachafibonacci/manager/data/RoomStore.java"
           grep -Fq '.put("status", "pending")' "$R/app/src/main/java/ru/dachafibonacci/manager/data/RoomStore.java"
@@ -218,8 +225,8 @@ jobs:
           grep -Fq 'accommodationAmount' "$R/app/src/main/assets/www/app.js"
           grep -Fq 'data-open-payment-for' "$R/app/src/main/assets/www/app.js"
           grep -Fq '.booking-calendar-day.booked' "$R/app/src/main/assets/www/styles.css"
-          grep -Fq "versionName '0.9.3'" "$R/app/build.gradle"
-          grep -Fq "versionCode 21" "$R/app/build.gradle"
+          grep -Fq "versionName '0.10.0'" "$R/app/build.gradle"
+          grep -Fq "versionCode 23" "$R/app/build.gradle"
           grep -Fq "'guests'" "$R/app/src/main/assets/www/db.js"
           grep -Fq "function renderGuests" "$R/app/src/main/assets/www/app.js"
           grep -Fq "function migrateBookingGuests" "$R/app/src/main/assets/www/app.js"
@@ -232,6 +239,15 @@ jobs:
           grep -Fq "data-confirm-expected-payment" "$R/app/src/main/assets/www/app.js"
           grep -Fq "data-confirm-booking-remaining" "$R/app/src/main/assets/www/app.js"
           grep -Fq "Такой ожидаемый платёж уже добавлен" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "data-confirm-booking-deposit" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "Депозит отмечен на руках" "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'autoTaskType: '\''depositReturn'\''' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'function taskCategoryTone' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'task-colored' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'ACTION_TOGGLE_COLOR_SORT' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaListWidgetProvider.java"
+          grep -Fq 'DachaShoppingWidgetProvider' "$R/app/src/main/AndroidManifest.xml"
+          grep -Fq 'DachaBookingsWidgetProvider' "$R/app/src/main/AndroidManifest.xml"
+          grep -Fq 'widget_task_tone_6' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaTodayWidgetService.java"
           grep -Fq "financeSettings" "$R/app/src/main/assets/www/app.js"
           grep -Fq "premiumOffers" "$R/app/src/main/assets/www/app.js"
           grep -Fq "'guests'" "$R/server/apps-script/Code.gs"
@@ -265,15 +281,15 @@ jobs:
           set -euo pipefail
           DEBUG=dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
           RELEASE=dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
-          ALIGNED=dacha-v070-project/app/build/outputs/apk/release/nash-mir-v093-aligned-unsigned.apk
+          ALIGNED=dacha-v070-project/app/build/outputs/apk/release/nash-mir-v100-aligned-unsigned.apk
           test -s "$DEBUG"
           test -s "$RELEASE"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -f -p 4 "$RELEASE" "$ALIGNED"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -p -v 4 "$ALIGNED" > fixed-release-alignment.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$DEBUG" > fixed-badging.txt
           grep -Fq "package: name='ru.dachafibonacci.manager'" fixed-badging.txt
-          grep -Fq "versionName='0.9.3'" fixed-badging.txt
-          grep -Fq "versionCode='21'" fixed-badging.txt
+          grep -Fq "versionName='0.10.0'" fixed-badging.txt
+          grep -Fq "versionCode='23'" fixed-badging.txt
           grep -Fq "application-label:'Наш мир'" fixed-badging.txt
           grep -Fq 'Verification successful' fixed-release-alignment.txt
           cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" apksigner.jar
@@ -281,11 +297,11 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: nash-mir-v093-payment-confirmation
+          name: nash-mir-v100-focused-widgets
           path: |
             dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
             dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
-            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v093-aligned-unsigned.apk
+            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v100-aligned-unsigned.apk
             apksigner.jar
             fixed-badging.txt
             fixed-sha256.txt
