@@ -1,4 +1,4 @@
-name: Build Nash Mir v0.10.1 sync reliability
+name: Build Nash Mir v0.10.2 shopping expense
 
 on:
   pull_request:
@@ -179,6 +179,13 @@ jobs:
           echo "564aa811a0edc70fef392a1ec859733f6668f4bd350212c8c1bae0fbc39dabb4  v101-files.tar.xz" | sha256sum -c -
           tar -xJf v101-files.tar.xz -C dacha-v070-project
 
+          cat v102-shopping-expense-b64/part-{00,01} > v102-files.tar.xz.b64
+          test "$(wc -c < v102-files.tar.xz.b64)" -eq 61596
+          echo "32c69d929a1f2316ce9e2a0e246b169413a510fc221f965dd675a27f3ac45d81  v102-files.tar.xz.b64" | sha256sum -c -
+          base64 -d v102-files.tar.xz.b64 > v102-files.tar.xz
+          echo "3808bf86c1540afe4d9d158765f0f4b0b7a4213640499dca205dda1ce9ae4c87  v102-files.tar.xz" | sha256sum -c -
+          tar -xJf v102-files.tar.xz -C dacha-v070-project
+
       - name: Validate fixed source
         shell: bash
         run: |
@@ -232,8 +239,10 @@ jobs:
           grep -Fq 'accommodationAmount' "$R/app/src/main/assets/www/app.js"
           grep -Fq 'data-open-payment-for' "$R/app/src/main/assets/www/app.js"
           grep -Fq '.booking-calendar-day.booked' "$R/app/src/main/assets/www/styles.css"
-          grep -Fq "versionName '0.10.1'" "$R/app/build.gradle"
-          grep -Fq "versionCode 24" "$R/app/build.gradle"
+          grep -Fq "versionName '0.10.2'" "$R/app/build.gradle"
+          grep -Fq "versionCode 25" "$R/app/build.gradle"
+          grep -Fq 'widget_row_expense' "$R/app/src/main/res/layout/dacha_today_widget_row.xml"
+          grep -Fq 'R.id.widget_row_expense' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaTodayWidgetService.java"
           grep -Fq 'resolveVersionConflict' "$R/app/src/main/assets/www/sync.js"
           grep -Fq 'recoverStoredConflicts' "$R/app/src/main/assets/www/sync.js"
           grep -Fq 'refreshGuestBookingMirrors' "$R/app/src/main/assets/www/sync.js"
@@ -293,15 +302,15 @@ jobs:
           set -euo pipefail
           DEBUG=dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
           RELEASE=dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
-          ALIGNED=dacha-v070-project/app/build/outputs/apk/release/nash-mir-v101-aligned-unsigned.apk
+          ALIGNED=dacha-v070-project/app/build/outputs/apk/release/nash-mir-v102-aligned-unsigned.apk
           test -s "$DEBUG"
           test -s "$RELEASE"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -f -p 4 "$RELEASE" "$ALIGNED"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -p -v 4 "$ALIGNED" > fixed-release-alignment.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$DEBUG" > fixed-badging.txt
           grep -Fq "package: name='ru.dachafibonacci.manager'" fixed-badging.txt
-          grep -Fq "versionName='0.10.1'" fixed-badging.txt
-          grep -Fq "versionCode='24'" fixed-badging.txt
+          grep -Fq "versionName='0.10.2'" fixed-badging.txt
+          grep -Fq "versionCode='25'" fixed-badging.txt
           grep -Fq "application-label:'Наш мир'" fixed-badging.txt
           grep -Fq 'Verification successful' fixed-release-alignment.txt
           cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" apksigner.jar
@@ -309,11 +318,11 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: nash-mir-v101-sync-reliability
+          name: nash-mir-v102-shopping-expense
           path: |
             dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
             dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
-            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v101-aligned-unsigned.apk
+            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v102-aligned-unsigned.apk
             apksigner.jar
             fixed-badging.txt
             fixed-sha256.txt
