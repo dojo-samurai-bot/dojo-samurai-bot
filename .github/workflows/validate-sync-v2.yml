@@ -45,4 +45,4 @@ jobs:
           grep -Fq "LockService.getScriptLock" sync-v2/server/Code.gs
           grep -Fq "partial_conflict" sync-v2/server/Code.gs
           grep -Fq "Duplicate operationId with different payload" sync-v2/server/Code.gs
-          grep -Fq "сервер никогда не заменяет всю базу" <(tr '[:upper:]' '[:lower:]' < docs/SYNC_V2_MANIFEST.md)
+          grep -Fq "Сервер никогда не заменяет всю базу" docs/SYNC_V2_MANIFEST.md
