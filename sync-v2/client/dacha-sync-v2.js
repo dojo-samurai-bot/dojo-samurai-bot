@@ -308,13 +308,21 @@
   }
 
   async function postJson(payload) {
+    const body = JSON.stringify(payload);
+    if (window.AndroidBridge && typeof window.AndroidBridge.syncV2Request === 'function') {
+      const raw = String(window.AndroidBridge.syncV2Request(config.endpoint, body) || '');
+      if (!raw.trim()) throw new Error('Android не получил ответ сервера синхронизации');
+      try { return JSON.parse(raw); }
+      catch (_) { throw new Error('Сервер синхронизации вернул некорректный JSON'); }
+    }
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), config.requestTimeoutMs);
     try {
       const response = await fetch(config.endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload),
+        body,
         cache: 'no-store',
         signal: controller.signal,
       });
