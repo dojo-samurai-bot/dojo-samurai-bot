@@ -36,12 +36,13 @@ jobs:
           set -euo pipefail
           cd dacha-v061-project
           patch -p1 --forward --batch < ../sync-v2/integration/app-v061.patch
+          patch -p1 --forward --batch < ../sync-v2/integration/android-v061.patch
           cp ../sync-v2/overlay/db.js app/src/main/assets/www/db.js
           cp ../sync-v2/client/dacha-sync-v2.js app/src/main/assets/www/dacha-sync-v2.js
           sed -i "s/versionCode 9/versionCode 10/" app/build.gradle
           sed -i "s/versionName '0.6.1'/versionName '0.6.2-sync2-preview'/" app/build.gradle
 
-      - name: Validate integrated web source
+      - name: Validate integrated source
         shell: bash
         run: |
           set -euo pipefail
@@ -52,6 +53,8 @@ jobs:
           grep -Fq 'putWithOperation' dacha-v061-project/app/src/main/assets/www/db.js
           grep -Fq 'DachaSyncV2' dacha-v061-project/app/src/main/assets/www/app.js
           grep -Fq 'dacha-sync-v2.js' dacha-v061-project/app/src/main/assets/www/index.html
+          grep -Fq 'syncV2Request' dacha-v061-project/app/src/main/java/ru/dachafibonacci/manager/MainActivity.java
+          grep -Fq 'syncV2Request' dacha-v061-project/app/src/main/java/ru/dachafibonacci/manager/WidgetBridge.java
           grep -Fq "versionCode 10" dacha-v061-project/app/build.gradle
           grep -Fq "versionName '0.6.2-sync2-preview'" dacha-v061-project/app/build.gradle
 
