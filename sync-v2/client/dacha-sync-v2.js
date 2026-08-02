@@ -214,7 +214,7 @@
     for (const ack of acks) {
       await DB.updateOutbox(ack.operationId, current => ({
         ...current,
-        status: ack.status === 'conflict' ? 'conflict' : 'acked',
+        status: ['conflict', 'partial_conflict'].includes(ack.status) ? 'conflict' : 'acked',
         serverSequence: ack.serverSequence == null ? null : Number(ack.serverSequence),
         serverVersion: ack.entityVersion == null ? null : Number(ack.entityVersion),
         acknowledgedAt: nowIso(),
