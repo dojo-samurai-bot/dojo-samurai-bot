@@ -1,0 +1,48 @@
+name: Validate Sync v2
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sync-v2/**'
+      - 'docs/SYNC_V2_MANIFEST.md'
+      - '.github/workflows/validate-sync-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check client syntax
+        run: node --check sync-v2/client/sync-engine.js
+
+      - name: Check Apps Script syntax
+        shell: bash
+        run: |
+          cp sync-v2/server/Code.gs /tmp/sync-v2-server.js
+          node --check /tmp/sync-v2-server.js
+
+      - name: Validate protocol invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "operationId" sync-v2/client/sync-engine.js
+          grep -Fq "deviceId" sync-v2/client/sync-engine.js
+          grep -Fq "lastServerSequence" sync-v2/client/sync-engine.js
+          grep -Fq "LockService.getScriptLock" sync-v2/server/Code.gs
+          grep -Fq "partial_conflict" sync-v2/server/Code.gs
+          grep -Fq "Duplicate operationId with different payload" sync-v2/server/Code.gs
+          grep -Fq "сервер никогда не заменяет всю базу" <(tr '[:upper:]' '[:lower:]' < docs/SYNC_V2_MANIFEST.md)
