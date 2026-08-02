@@ -1,4 +1,4 @@
-name: Build Nash Mir sync v2 test
+name: Build Nash Mir sync v2 hardened test
 
 on:
   push:
@@ -57,6 +57,20 @@ jobs:
           echo "ad57dec1cc1585abaedc6a7a37fea9f62ceabe3d373a37b7b46162e2aff4f281  sync-v2-test-package.tar.xz" | sha256sum -c -
           tar -xJf sync-v2-test-package.tar.xz -C dacha-v070-project
 
+      - name: Apply sync v2 hardening
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat sync-v2-hardening-b64/part-00 > sync-v2-hardening.patch.xz.b64
+          test "$(wc -c < sync-v2-hardening.patch.xz.b64)" -eq 7820
+          echo "4020650d006cd1d19551ee78afea0d1271f2ee5ced6911583d715f0a757d753f  sync-v2-hardening.patch.xz.b64" | sha256sum -c -
+          base64 -d sync-v2-hardening.patch.xz.b64 > sync-v2-hardening.patch.xz
+          echo "9543b685e1f257e0a48001d4af1ff7f0da98ca77cc8e26196a9a8d609212f175  sync-v2-hardening.patch.xz" | sha256sum -c -
+          xz -dc sync-v2-hardening.patch.xz > sync-v2-hardening.patch
+          echo "5408d0b84e43aec058f8c5e60e479edc7f895a821b97f86fe47da661065a87d5  sync-v2-hardening.patch" | sha256sum -c -
+          cd dacha-v070-project
+          patch -p1 --forward --batch < ../sync-v2-hardening.patch
+
       - name: Validate sync v2 source and protocol
         shell: bash
         run: |
@@ -71,8 +85,8 @@ jobs:
           cp "$R/server/apps-script/Code.gs" /tmp/Code.js
           node --check /tmp/Code.js
           node "$R/server/tests/sync-v2.test.js" "$R/server/apps-script/Code.gs"
-          grep -Fq "versionName '0.11.0-sync2'" "$R/app/build.gradle"
-          grep -Fq "versionCode 27" "$R/app/build.gradle"
+          grep -Fq "versionName '0.11.1-sync2'" "$R/app/build.gradle"
+          grep -Fq "versionCode 28" "$R/app/build.gradle"
           grep -Fq "applicationIdSuffix '.sync2test'" "$R/app/build.gradle"
           grep -Fq 'Наш мир Sync Test' "$R/app/src/debug/AndroidManifest.xml"
           grep -Fq 'commit(JSONObject mutations)' "$J/data/RoomStore.java"
@@ -80,6 +94,10 @@ jobs:
           grep -Fq "'inbox'" "$W/db.js"
           grep -Fq "'tombstones'" "$W/db.js"
           grep -Fq 'computeMergeDecision' "$R/server/apps-script/Code.gs"
+          grep -Fq 'operationAlreadyReflected_' "$R/server/apps-script/Code.gs"
+          grep -Fq 'SERVER_INSTANCE_MISMATCH' "$R/server/apps-script/Code.gs"
+          grep -Fq 'serverInstanceId: current.serverInstanceId' "$W/sync.js"
+          grep -Fq 'bridgeReadyPromise = null' "$W/sync.js"
           grep -Fq 'resolveConflictRow' "$R/server/apps-script/Code.gs"
           grep -Fq 'id="syncConflictList"' "$W/index.html"
           grep -Fq 'renderSyncConflicts' "$W/app.js"
@@ -118,7 +136,7 @@ jobs:
           R=dacha-v070-project
           DEBUG=$R/app/build/outputs/apk/debug/app-debug.apk
           RELEASE=$R/app/build/outputs/apk/release/app-release-unsigned.apk
-          ALIGNED=$R/app/build/outputs/apk/release/nash-mir-v0110-sync-v2-aligned-unsigned.apk
+          ALIGNED=$R/app/build/outputs/apk/release/nash-mir-v0111-sync-v2-aligned-unsigned.apk
           AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
           ZIPALIGN="$ANDROID_HOME/build-tools/36.0.0/zipalign"
           test -s "$DEBUG"
@@ -127,26 +145,26 @@ jobs:
           "$ZIPALIGN" -c -p -v 4 "$ALIGNED" > sync-v2-release-alignment.txt
           "$AAPT" dump badging "$DEBUG" > sync-v2-badging.txt
           grep -Fq "package: name='ru.dachafibonacci.manager.sync2test'" sync-v2-badging.txt
-          grep -Fq "versionCode='27'" sync-v2-badging.txt
-          grep -Fq "versionName='0.11.0-sync2-test'" sync-v2-badging.txt
+          grep -Fq "versionCode='28'" sync-v2-badging.txt
+          grep -Fq "versionName='0.11.1-sync2-test'" sync-v2-badging.txt
           grep -Fq "application-label:'Наш мир Sync Test'" sync-v2-badging.txt
           grep -Fq 'Verification successful' sync-v2-release-alignment.txt
           cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" apksigner.jar
           tar --exclude='.git' --exclude='.gradle' --exclude='*/build' \
-            -cJf nash-mir-v0110-sync-v2-editable-source.tar.xz "$R"
+            -cJf nash-mir-v0111-sync-v2-editable-source.tar.xz "$R"
           sha256sum "$DEBUG" "$RELEASE" "$ALIGNED" apksigner.jar \
-            nash-mir-v0110-sync-v2-editable-source.tar.xz > sync-v2-sha256.txt
+            nash-mir-v0111-sync-v2-editable-source.tar.xz > sync-v2-sha256.txt
 
       - uses: actions/upload-artifact@v4
         with:
-          name: nash-mir-v0110-sync-v2-side-by-side-test
+          name: nash-mir-v0111-sync-v2-hardened-side-by-side-test
           path: |
             dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
             dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
-            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v0110-sync-v2-aligned-unsigned.apk
+            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v0111-sync-v2-aligned-unsigned.apk
             dacha-v070-project/server/apps-script/Code.gs
             dacha-v070-project/server/tests/sync-v2.test.js
-            nash-mir-v0110-sync-v2-editable-source.tar.xz
+            nash-mir-v0111-sync-v2-editable-source.tar.xz
             apksigner.jar
             sync-v2-badging.txt
             sync-v2-release-alignment.txt
