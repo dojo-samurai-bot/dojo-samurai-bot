@@ -1,0 +1,56 @@
+name: Export Nash Mir source for sync v2
+
+on:
+  push:
+    branches:
+      - agent/sync-v2-offline-first
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract reconstruction script
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('.github/workflows/build-dacha-v070-fixed.yml').read_text().splitlines()
+          start_marker = '      - name: Reconstruct source and apply all patches'
+          end_marker = '      - name: Validate fixed source'
+          start = source.index(start_marker)
+          end = source.index(end_marker)
+          run_line = next(i for i in range(start, end) if source[i].strip() == 'run: |')
+          body = source[run_line + 1:end]
+          indent = min(len(line) - len(line.lstrip()) for line in body if line.strip())
+          script = '\n'.join(line[indent:] if line.strip() else '' for line in body) + '\n'
+          Path('/tmp/reconstruct-latest.sh').write_text('set -euo pipefail\n' + script)
+          PY
+          bash /tmp/reconstruct-latest.sh
+
+      - name: Package editable source
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar --exclude='.git' --exclude='.gradle' --exclude='*/build' \
+            -cJf nash-mir-v103-editable-source.tar.xz dacha-v070-project
+          sha256sum nash-mir-v103-editable-source.tar.xz > nash-mir-v103-editable-source.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nash-mir-v103-editable-source
+          path: |
+            nash-mir-v103-editable-source.tar.xz
+            nash-mir-v103-editable-source.sha256
+          if-no-files-found: error
+          retention-days: 7

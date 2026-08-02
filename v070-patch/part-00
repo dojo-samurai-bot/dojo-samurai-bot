@@ -1,0 +1,122 @@
+diff --git a/README.md b/README.md
+index aa81030..0d8ef21 100644
+--- a/README.md
++++ b/README.md
+@@ -19,3 +19,12 @@ gradle :app:assembleDebug
+ ```
+ 
+ APK: `app/build/outputs/apk/debug/app-debug.apk`.
++
++
++## v0.7.0 development
++
++- Continues directly from v0.6.1; package and existing WebView interface are preserved.
++- Adds the `ideas` entity and the “Кубышка идей” card only on the Tasks page.
++- Ideas are intentionally excluded from both Android widgets.
++- The old SAF shared-file synchronization is scheduled for removal as Room/Apps Script synchronization lands.
++- Android remains offline-first; Windows and macOS use the same installable PWA interface.
+diff --git a/app/build.gradle b/app/build.gradle
+index c47e231..eeed906 100644
+--- a/app/build.gradle
++++ b/app/build.gradle
+@@ -10,8 +10,8 @@ android {
+         applicationId 'ru.dachafibonacci.manager'
+         minSdk 26
+         targetSdk 36
+-        versionCode 9
+-        versionName '0.6.1'
++        versionCode 10
++        versionName '0.7.0'
+     }
+ 
+     buildTypes {
+diff --git a/app/src/main/assets/www/app.js b/app/src/main/assets/www/app.js
+index 0fe452c..8f038d2 100644
+--- a/app/src/main/assets/www/app.js
++++ b/app/src/main/assets/www/app.js
+@@ -2,8 +2,8 @@
+   'use strict';
+ 
+   const DB = window.DachaDB;
+-  const APP_VERSION = '0.6.1';
+-  const SHARED_STORES = ['tasks', 'shopping', 'bookings', 'transactions'];
++  const APP_VERSION = '0.7.0';
++  const SHARED_STORES = ['tasks', 'shopping', 'bookings', 'transactions', 'ideas'];
+   const SHARED_SETTING_KEYS = ['taskCategoriesEnabled', 'taskCategories'];
+   const SYNC_ERROR_PREFIX = '__DACHA_SYNC_ERROR__:';
+   const VALID_PAGES = ['today', 'bookings', 'tasks', 'shopping', 'finance'];
+@@ -15,7 +15,7 @@
+     syncInProgress: false,
+     syncTimer: null,
+     syncPollTimer: null,
+-    data: { tasks: [], shopping: [], bookings: [], transactions: [], settings: [] },
++    data: { tasks: [], shopping: [], bookings: [], transactions: [], ideas: [], settings: [] },
+     formType: null,
+     editingId: null,
+     detail: null,
+@@ -572,6 +572,7 @@
+   function getTask(id) { return state.data.tasks.find(x => x.id === id) || null; }
+   function getShopping(id) { return state.data.shopping.find(x => x.id === id) || null; }
+   function getTransaction(id) { return state.data.transactions.find(x => x.id === id) || null; }
++  function getIdea(id) { return state.data.ideas.find(x => x.id === id) || null; }
+ 
+   function arrivalsToday() { return state.data.bookings.filter(b => b.checkInDate === todayISO() && b.status !== 'cancelled'); }
+   function departuresToday() { return state.data.bookings.filter(b => b.checkOutDate === todayISO() && b.status !== 'cancelled'); }
+@@ -580,7 +581,7 @@
+   function activeShopping() { return state.data.shopping.filter(x => !x.completed); }
+ 
+   async function refreshData(options = {}) {
+-    for (const store of ['tasks', 'shopping', 'bookings', 'transactions', 'settings']) {
++    for (const store of ['tasks', 'shopping', 'bookings', 'transactions', 'ideas', 'settings']) {
+       state.data[store] = await DB.getAll(store);
+     }
+     applyInterfaceScale();
+@@ -717,6 +718,22 @@
+     </div>`;
+   }
+ 
++
++  function renderIdeaItem(idea) {
++    const updated = idea.updatedAt || idea.createdAt || '';
++    const updatedLabel = updated
++      ? new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' }).format(new Date(updated))
++      : '';
++    return `<div class="list-item idea-item clickable-row" data-view-idea="${idea.id}">
++      <div class="idea-bullet" aria-hidden="true">✦</div>
++      <div class="item-body">
++        <div class="item-title">${escapeHtml(idea.title)}</div>
++        <div class="item-meta"><span>${updatedLabel ? `Добавлено ${escapeHtml(updatedLabel)}` : 'Идея'}</span>${idea.updatedBy ? `<span>${escapeHtml(idea.updatedBy)}</span>` : ''}</div>
++      </div>
++      <div class="item-actions"><button class="mini-button" data-edit-idea="${idea.id}" type="button" aria-label="Изменить">✎</button><button class="mini-button" data-delete="ideas:${idea.id}" type="button" aria-label="Удалить">×</button></div>
++    </div>`;
++  }
++
+   function renderBookings() {
+     const today = todayISO();
+     const groups = {
+@@ -782,7 +799,14 @@
+       </div>
+       <div class="task-layout">
+         <section class="card"><div class="task-list">${filtered.length ? filtered.map(renderTaskItem).join('') : `<div class="empty-state"><strong>В этом разделе пусто</strong>Новых задач нет.</div>`}</div></section>
+-        <aside class="card"><div class="card-header"><h3>Что купить</h3><button class="button text" data-page-link="shopping" type="button">Все · ${shop.length} →</button></div>${shop.length ? `<div class="list">${shop.slice(0, 8).map(renderShoppingItem).join('')}</div>` : `<div class="empty-state"><strong>Ничего покупать не нужно</strong></div>`}<button class="button secondary" data-open-form="shopping" type="button" style="width:100%;margin-top:12px">＋ В список</button></aside>
++        <div class="task-side-stack">
++          <aside class="card"><div class="card-header"><h3>Что купить</h3><button class="button text" data-page-link="shopping" type="button">Все · ${shop.length} →</button></div>${shop.length ? `<div class="list">${shop.slice(0, 8).map(renderShoppingItem).join('')}</div>` : `<div class="empty-state"><strong>Ничего покупать не нужно</strong></div>`}<button class="button secondary" data-open-form="shopping" type="button" style="width:100%;margin-top:12px">＋ В список</button></aside>
++          <aside class="card ideas-card">
++            <div class="card-header"><div><p class="eyebrow">Без сроков и категорий</p><h3>Кубышка идей</h3></div><span class="tag">${state.data.ideas.length}</span></div>
++            ${state.data.ideas.length ? `<div class="list idea-list">${[...state.data.ideas].sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))).map(renderIdeaItem).join('')}</div>` : `<div class="empty-state"><strong>Пока пусто</strong>Складывай сюда всё, что хочется однажды сделать для дачи.</div>`}
++            <form class="inline-add idea-add" id="quickIdeaForm"><input name="title" required maxlength="180" placeholder="Например, сделать уличный душ"><button class="button primary" type="submit" aria-label="Добавить идею">＋</button></form>
++          </aside>
++        </div>
+       </div>`;
+   }
+ 
+@@ -852,7 +876,7 @@
+     if (els.detailDialog.open) els.detailDialog.close();
+     state.formType = type;
+     state.editingId = data?.id || null;
+-    els.formTitle.textContent = ({ task: data ? 'Изменить дело' : 'Новое дело', shopping: data ? 'Изменить покупку' : 'Что купить', booking: data ? 'Изменить бронь' : 'Новая бронь', income: data ? 'Изменить доход' : 'Добавить доход', expense: data ? 'Изменить расход' : 'Добавить расход' })[type] || 'Добавить';
++    els.formTitle.textContent = ({ task: data ? 'Изменить дело' : 'Новое дело', shopping: data ? 'Изменить покупку' : 'Что купить', idea: data ? 'Изменить идею' : 'Новая идея', booking: data ? 'Изменить бронь' : 'Новая бронь', income: data ? 'Изменить доход' : 'Добавить доход', expense: data ? 'Изменить расход' : 'Добавить расход' })[type] || 'Добавить';
+     els.formFields.innerHTML = renderFormFields(type, data || {}, preset);
+     els.formDialog.showModal();
+     requestAnimationFrame(() => els.formFields.querySelector('[autofocus]')?.focus());
+@@ -874,6 
