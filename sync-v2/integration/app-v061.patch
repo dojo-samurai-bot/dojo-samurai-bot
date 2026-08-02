@@ -1,0 +1,315 @@
+--- a/app/src/main/assets/www/app.js
++++ b/app/src/main/assets/www/app.js
+@@ -2,10 +2,17 @@
+   'use strict';
+ 
+   const DB = window.DachaDB;
+-  const APP_VERSION = '0.6.1';
++  const APP_VERSION = '0.6.2-sync2-preview';
+   const SHARED_STORES = ['tasks', 'shopping', 'bookings', 'transactions'];
+   const SHARED_SETTING_KEYS = ['taskCategoriesEnabled', 'taskCategories'];
+   const SYNC_ERROR_PREFIX = '__DACHA_SYNC_ERROR__:';
++  const SYNC_V2_CRITICAL_FIELDS = {
++    bookings: ['checkInDate', 'checkInTime', 'checkOutDate', 'checkOutTime', 'totalAmount', 'prepaymentExpected', 'depositExpected', 'status'],
++    transactions: ['kind', 'amount', 'category', 'date', 'bookingId', 'paymentMethod', 'isDeposit'],
++    tasks: [],
++    shopping: [],
++    settings: [],
++  };
+   const VALID_PAGES = ['today', 'bookings', 'tasks', 'shopping', 'finance'];
+   const state = {
+     page: 'today',
+@@ -15,6 +22,7 @@
+     syncInProgress: false,
+     syncTimer: null,
+     syncPollTimer: null,
++    syncV2Status: null,
+     data: { tasks: [], shopping: [], bookings: [], transactions: [], settings: [] },
+     formType: null,
+     editingId: null,
+@@ -128,7 +136,9 @@
+   }
+ 
+   async function setSetting(key, value, refresh = true) {
+-    await DB.put('settings', { id: key, value, updatedAt: new Date().toISOString() });
++    const record = { id: key, value, updatedAt: new Date().toISOString() };
++    if (syncV2Enabled() && SHARED_SETTING_KEYS.includes(key)) await window.DachaSyncV2.put('settings', record, []);
++    else await DB.put('settings', record);
+     if (refresh) await refreshData();
+   }
+ 
+@@ -235,6 +245,65 @@
+     showToast(enabled ? 'Уведомления включены' : 'Уведомления выключены');
+   }
+ 
++  function syncV2Endpoint() { return String(setting('syncV2Endpoint', '') || '').trim(); }
++
++  function syncV2Enabled() {
++    return Boolean(syncV2Endpoint() && window.DachaSyncV2?.enabled?.());
++  }
++
++  function configureSyncV2() {
++    if (!window.DachaSyncV2?.configure) return false;
++    return window.DachaSyncV2.configure({
++      endpoint: syncV2Endpoint(),
++      apiKey: String(setting('syncV2ApiKey', '') || ''),
++      deviceName: String(setting('syncV2DeviceName', '') || currentUser() || 'Устройство'),
++      appVersion: APP_VERSION,
++      pollMs: 120000,
++      onStatus(status) {
++        state.syncV2Status = status;
++        refreshSyncSettings();
++        updateConnectionStatus(status.state === 'error' ? status.error || 'Ошибка синхронизации' : '');
++      },
++      async onRemoteChange(change) {
++        if (!change?.store || !DB.DATA_STORES.includes(change.store)) return;
++        state.data[change.store] = await DB.getAll(change.store);
++        if (change.store === 'settings') applyInterfaceScale();
++        render();
++        syncAndroidWidget();
++        refreshSyncSettings();
++      },
++      onConflict() {
++        showToast('Есть конфликт данных. Локальные данные сохранены.');
++      },
++    });
++  }
++
++  async function saveSyncV2Settings() {
++    const endpoint = String(document.getElementById('syncV2Endpoint')?.value || '').trim();
++    const apiKey = String(document.getElementById('syncV2ApiKey')?.value || '').trim();
++    const deviceName = String(document.getElementById('syncV2DeviceName')?.value || '').trim() || currentUser() || 'Устройство';
++    if (endpoint && !/^https:\/\//i.test(endpoint)) throw new Error('Адрес сервера должен начинаться с https://');
++    const now = new Date().toISOString();
++    for (const [id, value] of [['syncV2Endpoint', endpoint], ['syncV2ApiKey', apiKey], ['syncV2DeviceName', deviceName]]) {
++      await DB.put('settings', { id, value, updatedAt: now });
++    }
++    state.data.settings = await DB.getAll('settings');
++    configureSyncV2();
++    startSyncPolling();
++    refreshSyncSettings();
++    updateConnectionStatus();
++    if (endpoint) {
++      showToast('Надёжная синхронизация включена');
++      queueSync(50);
++    } else {
++      showToast('Надёжная синхронизация выключена. Данные остались локально.');
++    }
++  }
++
++  function syncV2CriticalFields(store) {
++    return SYNC_V2_CRITICAL_FIELDS[store] || [];
++  }
++
+   function nativeBridgeAvailable() {
+     return Boolean(window.AndroidBridge && typeof window.AndroidBridge.hasSyncFile === 'function');
+   }
+@@ -275,6 +344,10 @@
+ 
+   async function markDeleted(store, id, deletedAt = new Date().toISOString()) {
+     if (!SHARED_STORES.includes(store) || !id) return;
++    if (syncV2Enabled()) {
++      await window.DachaSyncV2.remove(store, id);
++      return;
++    }
+     await saveTombstones([...tombstones(), { store, id, deletedAt }]);
+   }
+ 
+@@ -285,6 +358,7 @@
+   }
+ 
+   async function putShared(store, record) {
++    if (syncV2Enabled()) return window.DachaSyncV2.put(store, record, syncV2CriticalFields(store));
+     await clearTombstone(store, record.id);
+     return DB.put(store, record);
+   }
+@@ -473,21 +547,80 @@
+   }
+ 
+   function refreshSyncSettings(errorText = '') {
++    const usingV2 = syncV2Enabled();
++    if (usingV2) {
++      const status = state.syncV2Status || {};
++      const info = status.diagnostics || {};
++      const pending = Number(info.pendingCount || 0);
++      const conflicts = Number(info.conflictCount || 0);
++      const title = conflicts ? 'Нужна проверка конфликтов' : 'Надёжная синхронизация включена';
++      let text = errorText || '';
++      if (!text && navigator.onLine === false) text = `Офлайн · ${pending} изменений ожидают отправки`;
++      if (!text && conflicts) text = `Конфликтов: ${conflicts} · данные не перезаписаны молча`;
++      if (!text && status.state === 'syncing') text = 'Отправляем локальные изменения и получаем новые';
++      if (!text && pending) text = `Ожидают отправки: ${pending}`;
++      if (!text) text = info.lastSyncAt ? `Синхронизировано: ${new Date(info.lastSyncAt).toLocaleString('ru-RU')}` : 'Готово к первой синхронизации';
++      if (els.syncStatusTitle) els.syncStatusTitle.textContent = title;
++      if (els.syncStatusText) els.syncStatusText.textContent = text;
++      if (els.syncStatusCard) els.syncStatusCard.classList.toggle('error', Boolean(errorText || conflicts));
++      for (const id of ['createSyncFileButton', 'selectSyncFileButton', 'loadFromSyncButton', 'uploadToSyncButton', 'disconnectSyncButton']) {
++        const button = document.getElementById(id);
++        if (button) button.hidden = true;
++      }
++      const syncButton = document.getElementById('syncNowButton');
++      if (syncButton) syncButton.hidden = false;
++      return;
++    }
++
+     const connected = hasSyncFile();
+-    const title = connected ? syncFileLabel() || 'Общий файл подключён' : 'Файл не подключён';
++    const title = connected ? syncFileLabel() || 'Общий файл подключён' : 'Синхронизация не настроена';
+     const summary = setting('lastSyncSummary', '');
+     const normalText = summary ? `${lastSyncLabel()} · ${summary}` : lastSyncLabel();
+-    const text = connected ? (errorText || normalText) : 'Сейчас данные находятся только на этом устройстве.';
++    const text = connected ? (errorText || normalText) : 'Данные надёжно хранятся локально. Для нескольких устройств укажи адрес Sync v2.';
+     if (els.syncStatusTitle) els.syncStatusTitle.textContent = title;
+     if (els.syncStatusText) els.syncStatusText.textContent = text;
+     if (els.syncStatusCard) els.syncStatusCard.classList.toggle('error', Boolean(errorText));
++    for (const id of ['createSyncFileButton', 'selectSyncFileButton']) {
++      const button = document.getElementById(id);
++      if (button) button.hidden = false;
++    }
+     for (const id of ['syncNowButton', 'loadFromSyncButton', 'uploadToSyncButton', 'disconnectSyncButton']) {
+       const button = document.getElementById(id);
+       if (button) button.hidden = !connected;
+     }
+   }
+ 
++  async function syncV2Now(options = {}) {
++    if (!syncV2Enabled()) return false;
++    if (state.syncInProgress) return false;
++    state.syncInProgress = true;
++    els.connectionChip.classList.add('sync-pulse');
++    els.connectionText.textContent = 'Синхронизация…';
++    try {
++      const result = await window.DachaSyncV2.syncNow(options.silent ? 'background' : 'manual');
++      state.syncV2Status = { state: 'synced', diagnostics: result.diagnostics || await window.DachaSyncV2.diagnostics() };
++      for (const store of ['tasks', 'shopping', 'bookings', 'transactions', 'settings']) state.data[store] = await DB.getAll(store);
++      applyInterfaceScale();
++      render();
++      syncAndroidWidget();
++      refreshSyncSettings();
++      updateConnectionStatus();
++      if (!options.silent) showToast(`Синхронизировано · отправлено ${result.sent || 0}, получено ${result.received || 0}`);
++      return true;
++    } catch (error) {
++      console.error('Sync v2 failed', error);
++      refreshSyncSettings(error.message || 'Ошибка синхронизации');
++      updateConnectionStatus(error.message || 'Ошибка синхронизации');
++      if (!options.silent) showToast(`${error.message || 'Ошибка синхронизации'} · локальные данные сохранены`);
++      return false;
++    } finally {
++      state.syncInProgress = false;
++      els.connectionChip.classList.remove('sync-pulse');
++    }
++  }
++
+   async function syncNow(options = {}) {
++    if (syncV2Enabled()) return syncV2Now(options);
+     if (!hasSyncFile()) {
+       if (!options.silent) showToast('Сначала подключи общий файл');
+       refreshSyncSettings();
+@@ -556,6 +689,7 @@
+   }
+ 
+   function queueSync(delay = 900) {
++    if (syncV2Enabled()) { window.DachaSyncV2.scheduleSync(delay); return; }
+     if (!hasSyncFile()) return;
+     clearTimeout(state.syncTimer);
+     state.syncTimer = setTimeout(() => syncNow({ silent: true }), delay);
+@@ -563,6 +697,7 @@
+ 
+   function startSyncPolling() {
+     clearInterval(state.syncPollTimer);
++    if (syncV2Enabled()) { window.DachaSyncV2.restartPolling(); return; }
+     if (!hasSyncFile()) return;
+     state.syncPollTimer = setInterval(() => {
+       if (document.visibilityState === 'visible') syncNow({ silent: true });
+@@ -1260,11 +1395,13 @@
+ 
+   function updateConnectionStatus(errorText = '') {
+     const online = navigator.onLine;
+-    const connected = hasSyncFile();
++    const connected = syncV2Enabled() || hasSyncFile();
++    const pending = Number(state.syncV2Status?.diagnostics?.pendingCount || 0);
+     els.connectionChip.classList.toggle('offline', !online || Boolean(errorText));
+     if (state.syncInProgress) els.connectionText.textContent = 'Синхронизация…';
+-    else if (errorText) els.connectionText.textContent = 'Ошибка синхронизации';
+-    else if (!online) els.connectionText.textContent = connected ? 'Без сети · изменения сохранены' : 'Без сети · локально';
++    else if (errorText) els.connectionText.textContent = 'Ошибка · данные локально';
++    else if (!online) els.connectionText.textContent = pending ? `Офлайн · ждут ${pending}` : 'Офлайн · данные сохранены';
++    else if (syncV2Enabled()) els.connectionText.textContent = pending ? `В очереди: ${pending}` : 'Синхронизировано';
+     else els.connectionText.textContent = connected ? 'Общий файл подключён' : 'Локально · сеть есть';
+   }
+ 
+@@ -1425,6 +1562,9 @@
+     document.getElementById('globalAddButton').addEventListener('click', () => els.actionSheet.showModal());
+     document.getElementById('settingsButton').addEventListener('click', () => {
+       document.getElementById('deviceUserName').value = setting('deviceUserName', '');
++      document.getElementById('syncV2Endpoint').value = setting('syncV2Endpoint', '');
++      document.getElementById('syncV2ApiKey').value = setting('syncV2ApiKey', '');
++      document.getElementById('syncV2DeviceName').value = setting('syncV2DeviceName', '') || setting('deviceUserName', '');
+       const savedScale = String(setting('interfaceScale', 'standard'));
+       document.getElementById('interfaceScale').value = ['micro', 'compact', 'standard'].includes(savedScale) ? savedScale : 'standard';
+       document.getElementById('taskCategoriesEnabled').checked = taskCategoriesEnabled();
+@@ -1442,6 +1582,7 @@
+     });
+     document.getElementById('saveDisplaySettings').addEventListener('click', saveDisplayAndCategorySettings);
+     document.getElementById('saveNotificationSettings').addEventListener('click', saveNotificationSettings);
++    document.getElementById('saveSyncV2Settings').addEventListener('click', () => safeAction(saveSyncV2Settings));
+     document.getElementById('addTaskCategory').addEventListener('click', addTaskCategory);
+     document.getElementById('newTaskCategory').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); addTaskCategory(); } });
+     document.getElementById('taskCategoriesEnabled').addEventListener('change', async () => {
+@@ -1542,6 +1683,8 @@
+     }
+     const migrated = await migrateLegacyAndroidData();
+     for (const store of ['tasks', 'shopping', 'bookings', 'transactions', 'settings']) state.data[store] = await DB.getAll(store);
++    configureSyncV2();
++    if (syncV2Enabled()) state.syncV2Status = { state: 'ready', diagnostics: await window.DachaSyncV2.diagnostics() };
+     applyInterfaceScale();
+     refreshNotificationSettings();
+     startSyncPolling();
+@@ -1550,7 +1693,7 @@
+     navigate(initialPage, { push: false, instant: true, scroll: false });
+     syncAndroidWidget();
+     refreshSyncSettings();
+-    if (hasSyncFile()) await syncNow({ silent: true });
++    if (syncV2Enabled() || hasSyncFile()) await syncNow({ silent: true });
+     if (migrated) showToast(`Перенесено записей: ${migrated}`);
+   }
+ 
+--- a/app/src/main/assets/www/index.html
++++ b/app/src/main/assets/www/index.html
+@@ -131,8 +131,19 @@
+           <label class="button secondary file-button">Импортировать копию<input id="importInput" type="file" accept="application/json" /></label>
+         </div>
+       </section>
++      <section class="settings-section sync-v2-section">
++        <h3>Надёжная синхронизация</h3>
++        <p>Для пяти и более устройств. Каждое изменение сначала сохраняется локально, затем отправляется на сервер отдельной операцией. Полная база телефона никогда не перезаписывает остальные устройства.</p>
++        <label>Адрес Sync v2<input id="syncV2Endpoint" type="url" inputmode="url" placeholder="https://script.google.com/macros/s/.../exec"></label>
++        <div class="field-row">
++          <label>Ключ доступа<input id="syncV2ApiKey" type="password" autocomplete="off" placeholder="Необязательно, но рекомендуется"></label>
++          <label>Название устройства<input id="syncV2DeviceName" type="text" maxlength="60" placeholder="Телефон Дмитрия"></label>
++        </div>
++        <button id="saveSyncV2Settings" class="button primary" type="button">Сохранить и подключить</button>
++        <p class="sync-note">Без интернета приложение продолжает работать. Изменения остаются в локальной очереди и отправляются после восстановления связи.</p>
++      </section>
+       <section class="settings-section sync-section">
+-        <h3>Общие данные на двух телефонах</h3>
++        <h3>Старая синхронизация через общий файл</h3>
+         <p>Приложение может хранить общий файл в Google Диске или другом облаке через системный выбор файлов Android. На обоих телефонах нужно подключить один и тот же файл.</p>
+         <div id="syncStatusCard" class="sync-status-card">
+           <strong id="syncStatusTitle">Файл не подключён</strong>
+@@ -153,12 +164,13 @@
+         <button id="demoDataButton" class="button secondary" type="button">Добавить демонстрационные данные</button>
+         <button id="clearDataButton" class="button danger" type="button">Удалить все данные</button>
+       </section>
+-      <p class="version-line">Версия 0.6.1 · Android/WebView</p>
++      <p class="version-line">Версия 0.6.2 Sync v2 Preview · Android/WebView</p>
+     </div>
+   </dialog>
+ 
+   <div id="toast" class="toast" role="status"></div>
+   <script src="./db.js"></script>
++  <script src="./dacha-sync-v2.js"></script>
+   <script src="./app.js"></script>
+ </body>
+ </html>
