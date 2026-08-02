@@ -1,0 +1,45 @@
+name: Export v0.6.1 source for sync-v2 migration
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Reconstruct archived project
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat v061-source/part-00 v061-source/part-01 v061-source/part-02 v061-source/part-03 > dacha-v061-final.tar.xz.b64
+          test "$(wc -c < dacha-v061-final.tar.xz.b64)" -eq 70924
+          base64 --decode dacha-v061-final.tar.xz.b64 > dacha-v061-final.tar.xz
+          echo "303dab18c9c2989fe64a558af4131499c642a8141a8ee2451558a52b0a49169e  dacha-v061-final.tar.xz" | sha256sum -c -
+          tar -xJf dacha-v061-final.tar.xz
+
+      - name: Validate source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f dacha-v061-project/app/src/main/assets/www/app.js
+          test -f dacha-v061-project/app/src/main/assets/www/index.html
+          test -f dacha-v061-project/app/src/main/java/ru/dachafibonacci/manager/MainActivity.java
+          node --check dacha-v061-project/app/src/main/assets/www/app.js
+
+      - name: Upload reconstructed source
+        uses: actions/upload-artifact@v4
+        with:
+          name: dacha-v061-reconstructed-source
+          path: dacha-v061-project/
+          if-no-files-found: error
+          retention-days: 7
