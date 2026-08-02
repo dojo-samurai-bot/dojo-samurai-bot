@@ -1,0 +1,88 @@
+--- a/app/src/main/java/ru/dachafibonacci/manager/MainActivity.java
++++ b/app/src/main/java/ru/dachafibonacci/manager/MainActivity.java
+@@ -33,6 +33,8 @@
+ import java.io.OutputStream;
+ import java.nio.charset.StandardCharsets;
+ import java.security.MessageDigest;
++import java.net.HttpURLConnection;
++import java.net.URL;
+ 
+ public final class MainActivity extends Activity {
+     private static final int FILE_CHOOSER_REQUEST = 401;
+@@ -342,6 +344,66 @@
+         return output.toString();
+     }
+ 
++    public String syncV2Request(String endpoint, String json) {
++        HttpURLConnection connection = null;
++        try {
++            URL url = new URL(endpoint == null ? "" : endpoint.trim());
++            if (!"https".equalsIgnoreCase(url.getProtocol())) {
++                throw new IOException("Sync v2 принимает только HTTPS");
++            }
++            connection = (HttpURLConnection) url.openConnection();
++            connection.setConnectTimeout(15000);
++            connection.setReadTimeout(30000);
++            connection.setInstanceFollowRedirects(true);
++            connection.setRequestMethod("POST");
++            connection.setDoOutput(true);
++            connection.setUseCaches(false);
++            connection.setRequestProperty("Content-Type", "text/plain;charset=utf-8");
++            connection.setRequestProperty("Accept", "application/json");
++            byte[] bytes = (json == null ? "{}" : json).getBytes(StandardCharsets.UTF_8);
++            connection.setFixedLengthStreamingMode(bytes.length);
++            try (OutputStream output = connection.getOutputStream()) {
++                output.write(bytes);
++                output.flush();
++            }
++
++            int status = connection.getResponseCode();
++            InputStream stream = status >= 200 && status < 400
++                ? connection.getInputStream()
++                : connection.getErrorStream();
++            String body = readTextStream(stream);
++            if (status < 200 || status >= 400) {
++                return new JSONObject()
++                    .put("ok", false)
++                    .put("error", "Sync HTTP " + status + (body.isEmpty() ? "" : ": " + body))
++                    .toString();
++            }
++            if (body.trim().isEmpty()) throw new IOException("Сервер синхронизации вернул пустой ответ");
++            return body;
++        } catch (Exception error) {
++            try {
++                return new JSONObject()
++                    .put("ok", false)
++                    .put("error", readableSyncError(error))
++                    .toString();
++            } catch (Exception ignored) {
++                return "{\"ok\":false,\"error\":\"Ошибка Sync v2\"}";
++            }
++        } finally {
++            if (connection != null) connection.disconnect();
++        }
++    }
++
++    private String readTextStream(InputStream input) throws Exception {
++        if (input == null) return "";
++        try (InputStream source = input; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
++            byte[] buffer = new byte[8192];
++            int count;
++            while ((count = source.read(buffer)) != -1) output.write(buffer, 0, count);
++            return output.toString(StandardCharsets.UTF_8.name());
++        }
++    }
++
+     public boolean writeSyncFile(String json) {
+         Uri uri = syncUri();
+         if (uri == null) return false;
+--- a/app/src/main/java/ru/dachafibonacci/manager/WidgetBridge.java
++++ b/app/src/main/java/ru/dachafibonacci/manager/WidgetBridge.java
+@@ -42,6 +42,7 @@
+     @JavascriptInterface public String getSyncConnectionMode() { return activity.getSyncConnectionMode(); }
+     @JavascriptInterface public boolean writeSyncFile(String json) { return activity.writeSyncFile(json); }
+     @JavascriptInterface public void disconnectSyncFile() { activity.disconnectSyncFile(); }
++    @JavascriptInterface public String syncV2Request(String endpoint, String json) { return activity.syncV2Request(endpoint, json); }
+ 
+     @JavascriptInterface public boolean configureNotifications(boolean enabled, int hour, int minute) {
+         return activity.configureNotifications(enabled, hour, minute);
