@@ -161,7 +161,7 @@
     const entityId = event.entity.entityId;
     const entityVersionKey = `entityVersion:${storeName}:${entityId}`;
     await runTransaction([storeName, 'syncMeta', 'syncAppliedOps'], 'readwrite', async stores => {
-      if (event.entity.deleted) stores[storeName].delete(entityId);
+      if (event.entity.deleted || !rebasedRecord) stores[storeName].delete(entityId);
       else stores[storeName].put(rebasedRecord);
       stores.syncMeta.put({ key: entityVersionKey, value: Number(event.entity.version || 0) });
       stores.syncMeta.put({ key: 'lastServerSequence', value: Number(event.serverSequence || 0) });
