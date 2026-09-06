@@ -1,0 +1,45 @@
+Podval Myslei Local Chat v0.1.0
+Build UTC: 2026-09-06T23:52:03Z
+APK bytes: 21005
+fe8a7b6daabed84893f4f8920b3d925a36a3becd8b1369b12092c46ae32db7f6  dist/podval-myslei-local-chat-v0.1.0.apk
+
+package: name='ru.podvalmyslei.chat' versionCode='1' versionName='0.1.0' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+sdkVersion:'26'
+targetSdkVersion:'35'
+uses-permission: name='android.permission.INTERNET'
+uses-permission: name='android.permission.ACCESS_NETWORK_STATE'
+application: label='' icon=''
+application-debuggable
+launchable-activity: name='ru.podvalmyslei.chat.MainActivity'  label='' icon=''
+feature-group: label=''
+  uses-feature: name='android.hardware.faketouch'
+  uses-implied-feature: name='android.hardware.faketouch' reason='default feature for all apps'
+  uses-feature: name='android.hardware.screen.portrait'
+  uses-implied-feature: name='android.hardware.screen.portrait' reason='one or more activities have specified a portrait orientation'
+main
+supports-screens: 'small' 'normal' 'large' 'xlarge'
+supports-any-density: 'true'
+locales:
+densities:
+
+package: ru.podvalmyslei.chat
+uses-permission: name='android.permission.INTERNET'
+uses-permission: name='android.permission.ACCESS_NETWORK_STATE'
+
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): false
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+Signer #1 certificate DN: C=US, O=Android, CN=Android Debug
+Signer #1 certificate SHA-256 digest: a94036a40df2632653345909a128e261f477f8c448969b218f5b326ab8432198
+Signer #1 certificate SHA-1 digest: 9cc6f72df851c9ee0a42666335d6ae62b9f26f5d
+Signer #1 certificate MD5 digest: 1d1b2a156461e4b230bbf79e52b0f2b9
+Signer #1 key algorithm: RSA
+Signer #1 key size (bits): 2048
+Signer #1 public key SHA-256 digest: c7034b12850ebfe6311c8c3423c5c8f6d6511d484f5cca9bbb06896533e7fcf2
+Signer #1 public key SHA-1 digest: 8fc4b0e58b0ae515c329acf91ab6e103c2b71a59
+Signer #1 public key MD5 digest: e801ce910fb6281331e27f8c2fc574fd

@@ -1,0 +1,1 @@
+fe8a7b6daabed84893f4f8920b3d925a36a3becd8b1369b12092c46ae32db7f6  dist/podval-myslei-local-chat-v0.1.0.apk
