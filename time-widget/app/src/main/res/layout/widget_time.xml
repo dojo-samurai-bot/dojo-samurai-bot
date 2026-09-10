@@ -6,57 +6,74 @@
     android:padding="4dp"
     android:background="@android:color/transparent">
 
-    <LinearLayout
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@drawable/widget_glass"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="20dp"
-        android:paddingTop="6dp"
-        android:paddingEnd="18dp"
-        android:paddingBottom="6dp">
+        android:background="@drawable/widget_glass">
 
-        <TextClock
-            android:id="@+id/time_text"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:fontFamily="sans-serif-light"
-            android:format12Hour="h:mm"
-            android:format24Hour="HH:mm"
-            android:includeFontPadding="false"
-            android:maxLines="1"
-            android:textColor="#F8FBFF"
-            android:textSize="39sp" />
+        <ProgressBar
+            android:id="@+id/day_fill"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:max="900"
+            android:progress="0"
+            android:progressDrawable="@drawable/day_fill_progress" />
 
-        <TextView
-            android:layout_width="1dp"
-            android:layout_height="34dp"
-            android:layout_marginStart="10dp"
-            android:layout_marginEnd="14dp"
-            android:background="#55FFFFFF"
-            android:text="" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="20dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="18dp"
+            android:paddingBottom="4dp">
 
-        <ImageView
-            android:layout_width="27dp"
-            android:layout_height="27dp"
-            android:layout_marginEnd="11dp"
-            android:contentDescription="@string/clock_icon_description"
-            android:src="@drawable/ic_clock" />
+            <TextClock
+                android:id="@+id/time_text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="sans-serif"
+                android:format12Hour="h:mm"
+                android:format24Hour="HH:mm"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:textColor="#FFFFFFFF"
+                android:textSize="48sp"
+                android:textStyle="bold" />
 
-        <TextClock
-            android:id="@+id/date_text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:fontFamily="sans-serif-medium"
-            android:format12Hour="EEE, d MMM&#10;yyyy"
-            android:format24Hour="EEE, d MMM&#10;yyyy"
-            android:includeFontPadding="false"
-            android:lineSpacingExtra="1dp"
-            android:maxLines="2"
-            android:textColor="#E9F0FA"
-            android:textSize="13sp" />
+            <TextView
+                android:id="@+id/divider"
+                android:layout_width="1dp"
+                android:layout_height="34dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="14dp"
+                android:background="#55FFFFFF"
+                android:text="" />
 
-    </LinearLayout>
+            <ImageView
+                android:id="@+id/clock_icon"
+                android:layout_width="27dp"
+                android:layout_height="27dp"
+                android:layout_marginEnd="11dp"
+                android:contentDescription="@string/clock_icon_description"
+                android:src="@drawable/ic_clock" />
+
+            <TextClock
+                android:id="@+id/date_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:format12Hour="EEE, d MMM&#10;yyyy"
+                android:format24Hour="EEE, d MMM&#10;yyyy"
+                android:includeFontPadding="false"
+                android:lineSpacingExtra="1dp"
+                android:maxLines="2"
+                android:textColor="#F2F6FC"
+                android:textSize="13sp" />
+
+        </LinearLayout>
+    </FrameLayout>
 </FrameLayout>
