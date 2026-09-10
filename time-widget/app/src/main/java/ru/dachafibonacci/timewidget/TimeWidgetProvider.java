@@ -5,7 +5,7 @@ import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
 import android.content.Context;
 import android.content.Intent;
-import android.provider.Settings;
+import android.provider.AlarmClock;
 import android.widget.RemoteViews;
 
 public class TimeWidgetProvider extends AppWidgetProvider {
@@ -20,13 +20,13 @@ public class TimeWidgetProvider extends AppWidgetProvider {
     private static void updateWidget(Context context, AppWidgetManager manager, int appWidgetId) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_time);
 
-        Intent settingsIntent = new Intent(Settings.ACTION_DATE_SETTINGS);
-        settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        Intent alarmIntent = new Intent(AlarmClock.ACTION_SHOW_ALARMS);
+        alarmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 context,
-                1001,
-                settingsIntent,
+                1002,
+                alarmIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
