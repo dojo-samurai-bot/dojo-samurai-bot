@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Стеклянные часы</string>
     <string name="widget_name">Стеклянные часы 4×1</string>
-    <string name="widget_description">Прозрачные часы. Нажатие открывает системные настройки даты и времени.</string>
+    <string name="widget_description">Стеклянные часы с заполнением дня с 09:00 до 00:00. Нажатие открывает будильник.</string>
     <string name="clock_icon_description">Часы</string>
 </resources>
