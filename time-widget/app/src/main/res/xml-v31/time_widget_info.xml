@@ -4,7 +4,7 @@
     android:minHeight="56dp"
     android:targetCellWidth="4"
     android:targetCellHeight="1"
-    android:updatePeriodMillis="0"
+    android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/widget_time"
     android:previewLayout="@layout/widget_time"
     android:resizeMode="none"
