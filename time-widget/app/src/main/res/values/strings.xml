@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Стеклянные часы</string>
+    <string name="widget_name">Стеклянные часы 4×1</string>
+    <string name="widget_description">Прозрачные часы. Нажатие открывает системные настройки даты и времени.</string>
+    <string name="clock_icon_description">Часы</string>
+</resources>
