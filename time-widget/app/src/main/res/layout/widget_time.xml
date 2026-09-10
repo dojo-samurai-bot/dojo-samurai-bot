@@ -30,12 +30,13 @@
             android:textColor="#F8FBFF"
             android:textSize="39sp" />
 
-        <View
+        <TextView
             android:layout_width="1dp"
             android:layout_height="34dp"
             android:layout_marginStart="10dp"
             android:layout_marginEnd="14dp"
-            android:background="#55FFFFFF" />
+            android:background="#55FFFFFF"
+            android:text="" />
 
         <ImageView
             android:layout_width="27dp"
