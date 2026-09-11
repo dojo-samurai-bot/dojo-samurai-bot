@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Стеклянные часы</string>
+    <string name="blank_widget_label">&#8203;</string>
     <string name="widget_name">Стеклянные часы 4×1</string>
     <string name="widget_description">Стеклянные часы с заполнением дня с 09:00 до 00:00. Нажатие открывает будильник.</string>
     <string name="clock_icon_description">Часы</string>
