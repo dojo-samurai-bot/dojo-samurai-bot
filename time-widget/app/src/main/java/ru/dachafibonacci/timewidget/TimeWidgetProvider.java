@@ -6,9 +6,6 @@ import android.appwidget.AppWidgetProvider;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
-import android.provider.AlarmClock;
 import android.widget.RemoteViews;
 
 import java.util.Calendar;
@@ -58,11 +55,13 @@ public class TimeWidgetProvider extends AppWidgetProvider {
         int visualProgress = progress > 0 ? Math.max(progress, 45) : 0;
         views.setProgressBar(R.id.day_fill, 900, visualProgress, false);
 
-        Intent alarmIntent = createAlarmIntent(context);
+        Intent proxyIntent = new Intent(context, AlarmProxyActivity.class);
+        proxyIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 context,
-                5000 + appWidgetId,
-                alarmIntent,
+                7000 + appWidgetId,
+                proxyIntent,
                 PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
@@ -81,36 +80,5 @@ public class TimeWidgetProvider extends AppWidgetProvider {
         }
 
         manager.updateAppWidget(appWidgetId, views);
-    }
-
-    private static Intent createAlarmIntent(Context context) {
-        PackageManager pm = context.getPackageManager();
-
-        Intent showAlarms = new Intent(AlarmClock.ACTION_SHOW_ALARMS);
-        showAlarms.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        ResolveInfo showInfo = pm.resolveActivity(showAlarms, PackageManager.MATCH_DEFAULT_ONLY);
-        if (showInfo != null && showInfo.activityInfo != null) {
-            showAlarms.setComponent(new ComponentName(
-                    showInfo.activityInfo.packageName,
-                    showInfo.activityInfo.name
-            ));
-            return showAlarms;
-        }
-
-        Intent setAlarm = new Intent(AlarmClock.ACTION_SET_ALARM);
-        setAlarm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        ResolveInfo setInfo = pm.resolveActivity(setAlarm, PackageManager.MATCH_DEFAULT_ONLY);
-        if (setInfo != null && setInfo.activityInfo != null) {
-            Intent launchClock = pm.getLaunchIntentForPackage(setInfo.activityInfo.packageName);
-            if (launchClock != null) {
-                launchClock.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                return launchClock;
-            }
-            setAlarm.setComponent(new ComponentName(
-                    setInfo.activityInfo.packageName,
-                    setInfo.activityInfo.name
-            ));
-        }
-        return setAlarm;
     }
 }
