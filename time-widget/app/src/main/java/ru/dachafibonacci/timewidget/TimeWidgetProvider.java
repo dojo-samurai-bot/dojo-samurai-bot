@@ -55,8 +55,6 @@ public class TimeWidgetProvider extends AppWidgetProvider {
         } else {
             progress = Math.min(900, totalMinutes - 9 * 60);
         }
-        // Immediately after 09:00 keep a small visible leading edge; otherwise a mathematically
-        // correct 1-2% fill is practically invisible on a 4x1 widget.
         int visualProgress = progress > 0 ? Math.max(progress, 45) : 0;
         views.setProgressBar(R.id.day_fill, 900, visualProgress, false);
 
@@ -88,27 +86,31 @@ public class TimeWidgetProvider extends AppWidgetProvider {
     private static Intent createAlarmIntent(Context context) {
         PackageManager pm = context.getPackageManager();
 
-        Intent alarms = new Intent(AlarmClock.ACTION_SHOW_ALARMS);
-        alarms.addCategory(Intent.CATEGORY_DEFAULT);
-        alarms.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        ResolveInfo alarmsInfo = pm.resolveActivity(alarms, PackageManager.MATCH_DEFAULT_ONLY);
-        if (alarmsInfo != null && alarmsInfo.activityInfo != null) {
-            alarms.setComponent(new ComponentName(
-                    alarmsInfo.activityInfo.packageName,
-                    alarmsInfo.activityInfo.name
+        Intent showAlarms = new Intent(AlarmClock.ACTION_SHOW_ALARMS);
+        showAlarms.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        ResolveInfo showInfo = pm.resolveActivity(showAlarms, PackageManager.MATCH_DEFAULT_ONLY);
+        if (showInfo != null && showInfo.activityInfo != null) {
+            showAlarms.setComponent(new ComponentName(
+                    showInfo.activityInfo.packageName,
+                    showInfo.activityInfo.name
             ));
-            return alarms;
+            return showAlarms;
         }
 
-        Intent clock = Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CLOCK);
-        clock.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        ResolveInfo clockInfo = pm.resolveActivity(clock, PackageManager.MATCH_DEFAULT_ONLY);
-        if (clockInfo != null && clockInfo.activityInfo != null) {
-            clock.setComponent(new ComponentName(
-                    clockInfo.activityInfo.packageName,
-                    clockInfo.activityInfo.name
+        Intent setAlarm = new Intent(AlarmClock.ACTION_SET_ALARM);
+        setAlarm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        ResolveInfo setInfo = pm.resolveActivity(setAlarm, PackageManager.MATCH_DEFAULT_ONLY);
+        if (setInfo != null && setInfo.activityInfo != null) {
+            Intent launchClock = pm.getLaunchIntentForPackage(setInfo.activityInfo.packageName);
+            if (launchClock != null) {
+                launchClock.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                return launchClock;
+            }
+            setAlarm.setComponent(new ComponentName(
+                    setInfo.activityInfo.packageName,
+                    setInfo.activityInfo.name
             ));
         }
-        return clock;
+        return setAlarm;
     }
 }
