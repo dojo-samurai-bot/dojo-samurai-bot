@@ -5,7 +5,6 @@ import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.os.Bundle;
 import android.provider.AlarmClock;
-import android.provider.Settings;
 
 public class AlarmProxyActivity extends Activity {
 
@@ -17,13 +16,13 @@ public class AlarmProxyActivity extends Activity {
     }
 
     private void openAlarms() {
-        // Vivo / iQOO stock Clock. The user's device is Vivo-family, so try it first.
+        // Vivo / iQOO stock Clock first.
         if (tryStart(new Intent(AlarmClock.ACTION_SHOW_ALARMS)
                 .setPackage("com.android.BBKClock"))) {
             return;
         }
 
-        // Standard Android contract used by Clock apps that expose an alarm list.
+        // Standard Android contract for an alarm list.
         if (tryStart(new Intent(AlarmClock.ACTION_SHOW_ALARMS))) {
             return;
         }
@@ -34,13 +33,8 @@ public class AlarmProxyActivity extends Activity {
             return;
         }
 
-        // Last functional fallback: open alarm creation in any compatible Clock app.
-        if (tryStart(new Intent(AlarmClock.ACTION_SET_ALARM))) {
-            return;
-        }
-
-        // Absolute last resort: system alarm-related settings.
-        tryStart(new Intent(Settings.ACTION_ALARM_SETTINGS));
+        // Final functional fallback: open alarm creation in any compatible Clock app.
+        tryStart(new Intent(AlarmClock.ACTION_SET_ALARM));
     }
 
     private boolean tryStart(Intent intent) {
