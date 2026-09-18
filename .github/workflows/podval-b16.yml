@@ -15,6 +15,7 @@ jobs:
       - name: Download B16 source checkpoint
         run: |
           curl --fail --location 'https://sdmntprdenmarkeast.oaiusercontent.com/files/00000000-c020-8210-8fd3-b79fd2f284f9/raw?se=2026-09-18T22%3A10%3A12Z&sp=r&sv=2026-02-06&sr=b&scid=e77b01aa-53cb-5444-8c53-8f3c30810cea&skoid=3804227d-1b52-417d-afd9-9ffbb50fa53e&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-18T20%3A11%3A18Z&ske=2026-09-19T20%3A11%3A18Z&sks=b&skv=2026-02-06&sig=j4K02xxpmRtobpM9mIOZjkNo5aGQOss1oSNhxttD6Bg%3D' -o /tmp/podval-b16.zip
+          rm -rf podval
           mkdir -p podval
           unzip -q /tmp/podval-b16.zip -d podval
           test -f podval/gradlew
@@ -26,15 +27,17 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK 35
+        run: |
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-
-      - name: Ensure Android SDK 35
-        run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
       - name: Verify source invariants
         working-directory: podval
