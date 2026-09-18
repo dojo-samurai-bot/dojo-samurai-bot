@@ -9,12 +9,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - uses: actions/checkout@v4
 
       - name: Download B16 source checkpoint
         run: |
-          curl --fail --location 'https://sdmntprdenmarkeast.oaiusercontent.com/files/00000000-c020-8210-8fd3-b79fd2f284f9/raw?se=2026-09-18T22%3A10%3A12Z&sp=r&sv=2026-02-06&sr=b&scid=e77b01aa-53cb-5444-8c53-8f3c30810cea&skoid=3804227d-1b52-417d-afd9-9ffbb50fa53e&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-18T20%3A11%3A18Z&ske=2026-09-19T20%3A11%3A18Z&sks=b&skv=2026-02-06&sig=j4K02xxpmRtobpM9mIOZjkNo5aGQOss1oSNhxttD6Bg%3D' -o /tmp/podval-b16.zip
+          curl --fail --location 'https://drive.usercontent.google.com/download?id=14-tPCZ6ostis1NdiPWPn5h6Xvo_m2b1J&export=download&confirm=t' -o /tmp/podval-b16.zip
           rm -rf podval
           mkdir -p podval
           unzip -q /tmp/podval-b16.zip -d podval
@@ -27,12 +30,13 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install SDK 35
+      - name: Install Android SDK 35
         run: |
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          SDKMANAGER=/usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          test -f /usr/local/lib/android/sdk/platforms/android-35/android.jar
 
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
