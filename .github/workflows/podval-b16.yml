@@ -32,10 +32,14 @@ jobs:
 
       - name: Install Android SDK 35
         run: |
-          SDKMANAGER=/usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager
-          test -x "$SDKMANAGER"
-          yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          find /usr/local/lib/android/sdk -maxdepth 5 -type f -name sdkmanager -print || true
+          SDKMANAGER="$(find /usr/local/lib/android/sdk -maxdepth 5 -type f -name sdkmanager | head -1)"
+          if [ -n "$SDKMANAGER" ]; then
+            yes | "$SDKMANAGER" --licenses >/dev/null || true
+            "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          fi
+          find /usr/local/lib/android/sdk/platforms -maxdepth 2 -name android.jar -print || true
           test -f /usr/local/lib/android/sdk/platforms/android-35/android.jar
 
       - name: Set up Gradle 8.9
