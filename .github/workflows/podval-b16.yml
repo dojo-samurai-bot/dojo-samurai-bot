@@ -1,0 +1,66 @@
+name: Podval B16 Android Build
+
+on:
+  push:
+    branches:
+      - podval-b16-build-20260919
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download B16 source checkpoint
+        run: |
+          curl --fail --location 'https://sdmntprdenmarkeast.oaiusercontent.com/files/00000000-c020-8210-8fd3-b79fd2f284f9/raw?se=2026-09-18T22%3A10%3A12Z&sp=r&sv=2026-02-06&sr=b&scid=e77b01aa-53cb-5444-8c53-8f3c30810cea&skoid=3804227d-1b52-417d-afd9-9ffbb50fa53e&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-18T20%3A11%3A18Z&ske=2026-09-19T20%3A11%3A18Z&sks=b&skv=2026-02-06&sig=j4K02xxpmRtobpM9mIOZjkNo5aGQOss1oSNhxttD6Bg%3D' -o /tmp/podval-b16.zip
+          mkdir -p podval
+          unzip -q /tmp/podval-b16.zip -d podval
+          test -f podval/gradlew
+          test -f podval/signing/podval-b13-test.jks
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Ensure Android SDK 35
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Verify source invariants
+        working-directory: podval
+        run: |
+          python3 scripts/verify_b16_architecture.py
+          python3 scripts/verify_room_invariants.py
+
+      - name: Test and build release
+        working-directory: podval
+        env:
+          PODVAL_STORE_FILE: ${{ github.workspace }}/podval/signing/podval-b13-test.jks
+          PODVAL_STORE_PASSWORD: android
+          PODVAL_KEY_ALIAS: androiddebugkey
+          PODVAL_KEY_PASSWORD: android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon clean test assembleRelease --stacktrace
+          cp app/build/outputs/apk/release/app-release.apk PODVAL_MYSLEI_STAGE07_B16_GENA_CHAT.apk
+          sha256sum PODVAL_MYSLEI_STAGE07_B16_GENA_CHAT.apk > PODVAL_MYSLEI_STAGE07_B16_APK_SHA256.txt
+          keytool -printcert -jarfile PODVAL_MYSLEI_STAGE07_B16_GENA_CHAT.apk | tee PODVAL_MYSLEI_STAGE07_B16_CERT.txt
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: podval-b16-apk
+          path: |
+            podval/PODVAL_MYSLEI_STAGE07_B16_GENA_CHAT.apk
+            podval/PODVAL_MYSLEI_STAGE07_B16_APK_SHA256.txt
+            podval/PODVAL_MYSLEI_STAGE07_B16_CERT.txt
