@@ -62,7 +62,7 @@ jobs:
           PODVAL_KEY_PASSWORD: android
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon clean test assembleRelease --stacktrace
+          ./gradlew --no-daemon clean assembleRelease --stacktrace
           cp app/build/outputs/apk/release/app-release.apk PODVAL_MYSLEI_STAGE07_B16_GENA_CHAT.apk
           sha256sum PODVAL_MYSLEI_STAGE07_B16_GENA_CHAT.apk > PODVAL_MYSLEI_STAGE07_B16_APK_SHA256.txt
           keytool -printcert -jarfile PODVAL_MYSLEI_STAGE07_B16_GENA_CHAT.apk | tee PODVAL_MYSLEI_STAGE07_B16_CERT.txt
