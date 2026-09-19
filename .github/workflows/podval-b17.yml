@@ -1,4 +1,5 @@
 name: Podval B17 Android Build
+# retry 2: deterministic gateway transport tests
 
 on:
   push:
