@@ -1,5 +1,5 @@
 name: Podval B17 Android Build
-# retry 4: final trainer exact-session priority
+# retry 5: final bounded runtime context
 
 on:
   push:
