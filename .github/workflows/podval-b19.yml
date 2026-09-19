@@ -38,9 +38,10 @@ jobs:
           cp podval-b19-overlay/AssistantReplyLimiter.kt podval/app/src/main/java/ru/dachafibonacci/podval/gena/AssistantReplyLimiter.kt
           cp podval-b19-overlay/TrainerPlanKnowledgeTest.kt podval/app/src/test/java/ru/dachafibonacci/podval/gena/TrainerPlanKnowledgeTest.kt
           cp podval-b19-overlay/AssistantReplyLimiterTest.kt podval/app/src/test/java/ru/dachafibonacci/podval/gena/AssistantReplyLimiterTest.kt
+          cp podval-b19-overlay/patch_b19_runtime.py podval/scripts/patch_b19_runtime.py
           cp podval-b19-overlay/verify_b19_fast_prompts.py podval/scripts/verify_b19_fast_prompts.py
           cp podval-b19-overlay/STAGE_10_B19_FAST_PROMPTS.md podval/STAGE_10_B19_FAST_PROMPTS.md
-          python3 podval-b19-overlay/patch_b19_runtime.py
+          python3 podval/scripts/patch_b19_runtime.py
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
