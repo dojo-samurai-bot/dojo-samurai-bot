@@ -1,0 +1,103 @@
+name: Podval B19 Fast Prompts Build
+
+on:
+  push:
+    branches:
+      - podval-b19-build-20260919
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download B17 canonical source checkpoint
+        run: |
+          curl --fail --location 'https://drive.usercontent.google.com/download?id=1bKANeEDHVBN1JUA0lS4Ux8Gt-PjpsikZ&export=download&confirm=t' -o /tmp/podval-b17.zip
+          rm -rf podval
+          mkdir -p podval
+          unzip -q /tmp/podval-b17.zip -d podval
+          test -f podval/gradlew
+          test -f podval/signing/podval-b13-test.jks
+          test -f podval/app/src/main/assets/assistant_knowledge/trainer_session_plan_v1.json
+
+      - name: Reapply proven B18 Gena transport
+        run: |
+          cp podval-b18-overlay/GenaGateway.kt podval/app/src/main/java/ru/dachafibonacci/podval/gena/GenaGateway.kt
+          python3 podval-b18-overlay/patch_b18.py podval/app/build.gradle.kts
+
+      - name: Apply B19 compact prompt runtime
+        run: |
+          cp podval-b19-overlay/TrainerPlanKnowledge.kt podval/app/src/main/java/ru/dachafibonacci/podval/gena/TrainerPlanKnowledge.kt
+          cp podval-b19-overlay/HelperKnowledgeStore.kt podval/app/src/main/java/ru/dachafibonacci/podval/gena/HelperKnowledgeStore.kt
+          cp podval-b19-overlay/GenaPrompt.kt podval/app/src/main/java/ru/dachafibonacci/podval/gena/GenaPrompt.kt
+          cp podval-b19-overlay/AssistantReplyLimiter.kt podval/app/src/main/java/ru/dachafibonacci/podval/gena/AssistantReplyLimiter.kt
+          cp podval-b19-overlay/TrainerPlanKnowledgeTest.kt podval/app/src/test/java/ru/dachafibonacci/podval/gena/TrainerPlanKnowledgeTest.kt
+          cp podval-b19-overlay/AssistantReplyLimiterTest.kt podval/app/src/test/java/ru/dachafibonacci/podval/gena/AssistantReplyLimiterTest.kt
+          cp podval-b19-overlay/verify_b19_fast_prompts.py podval/scripts/verify_b19_fast_prompts.py
+          cp podval-b19-overlay/STAGE_10_B19_FAST_PROMPTS.md podval/STAGE_10_B19_FAST_PROMPTS.md
+          python3 podval-b19-overlay/patch_b19_runtime.py
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK 35
+        run: |
+          SDKMANAGER="$(find /usr/local/lib/android/sdk -maxdepth 5 -type f -name sdkmanager | head -1)"
+          test -n "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          test -f /usr/local/lib/android/sdk/platforms/android-35/android.jar
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Verify B19 invariants
+        working-directory: podval
+        run: |
+          python3 scripts/verify_room_invariants.py
+          python3 scripts/verify_b19_fast_prompts.py
+
+      - name: Unit tests and release build
+        working-directory: podval
+        env:
+          PODVAL_STORE_FILE: ${{ github.workspace }}/podval/signing/podval-b13-test.jks
+          PODVAL_STORE_PASSWORD: android
+          PODVAL_KEY_ALIAS: androiddebugkey
+          PODVAL_KEY_PASSWORD: android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon clean test assembleRelease --stacktrace
+          cp app/build/outputs/apk/release/app-release.apk PODVAL_MYSLEI_STAGE10_B19_FAST_PROMPTS.apk
+          sha256sum PODVAL_MYSLEI_STAGE10_B19_FAST_PROMPTS.apk > PODVAL_MYSLEI_STAGE10_B19_APK_SHA256.txt
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs PODVAL_MYSLEI_STAGE10_B19_FAST_PROMPTS.apk | tee PODVAL_MYSLEI_STAGE10_B19_CERT.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging PODVAL_MYSLEI_STAGE10_B19_FAST_PROMPTS.apk | tee PODVAL_MYSLEI_STAGE10_B19_BADGING.txt
+
+      - name: Package final B19 source checkpoint
+        working-directory: podval
+        run: |
+          rm -rf .gradle app/build build
+          zip -qr PODVAL_MYSLEI_STAGE10_B19_FAST_PROMPTS_SOURCE.zip .             -x 'PODVAL_MYSLEI_STAGE10_B19_FAST_PROMPTS_SOURCE.zip'                'PODVAL_MYSLEI_STAGE10_B19_FAST_PROMPTS.apk'                'PODVAL_MYSLEI_STAGE10_B19_APK_SHA256.txt'                'PODVAL_MYSLEI_STAGE10_B19_CERT.txt'                'PODVAL_MYSLEI_STAGE10_B19_BADGING.txt'
+          sha256sum PODVAL_MYSLEI_STAGE10_B19_FAST_PROMPTS_SOURCE.zip > PODVAL_MYSLEI_STAGE10_B19_SOURCE_SHA256.txt
+
+      - name: Upload B19 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: podval-b19-final
+          path: |
+            podval/PODVAL_MYSLEI_STAGE10_B19_FAST_PROMPTS.apk
+            podval/PODVAL_MYSLEI_STAGE10_B19_APK_SHA256.txt
+            podval/PODVAL_MYSLEI_STAGE10_B19_CERT.txt
+            podval/PODVAL_MYSLEI_STAGE10_B19_BADGING.txt
+            podval/PODVAL_MYSLEI_STAGE10_B19_FAST_PROMPTS_SOURCE.zip
+            podval/PODVAL_MYSLEI_STAGE10_B19_SOURCE_SHA256.txt
+            podval/STAGE_10_B19_FAST_PROMPTS.md
