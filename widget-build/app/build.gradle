@@ -7,11 +7,11 @@ android {
     compileSdk 35
 
     defaultConfig {
-        applicationId 'ru.dachafibonacci.glassclockwidget.v82resize'
+        applicationId 'ru.dachafibonacci.glassclockwidget.v83fit'
         minSdk 26
         targetSdk 35
-        versionCode 82
-        versionName '8.2-resizable'
+        versionCode 83
+        versionName '8.3-fit-water-ltr'
     }
 
     buildTypes {
