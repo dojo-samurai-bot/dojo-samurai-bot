@@ -23,10 +23,17 @@ public final class WidgetRenderer {
     public static Bitmap render(Context context, int appWidgetId) {
         DisplayMetrics dm = context.getResources().getDisplayMetrics();
         Bundle options = AppWidgetManager.getInstance(context).getAppWidgetOptions(appWidgetId);
-        int minWidthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 320);
 
-        int width = clamp(Math.round(minWidthDp * dm.density), 720, 920);
-        int height = clamp(Math.round(width / 5.05f), 150, 190);
+        int minWidthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250);
+        int maxWidthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, minWidthDp);
+        int minHeightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 54);
+        int maxHeightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, minHeightDp);
+
+        int widthDp = Math.max(minWidthDp, Math.min(maxWidthDp, 700));
+        int heightDp = Math.max(40, Math.min(Math.max(minHeightDp, maxHeightDp), 220));
+
+        int width = clamp(Math.round(widthDp * dm.density), 480, 1500);
+        int height = clamp(Math.round(heightDp * dm.density), 90, 620);
         return drawWidget(width, height, progressNow());
     }
 
@@ -35,7 +42,7 @@ public final class WidgetRenderer {
         Canvas c = new Canvas(bitmap);
         c.drawColor(Color.TRANSPARENT);
 
-        float pad = height * 0.055f;
+        float pad = Math.max(4f, height * 0.045f);
         RectF capsule = new RectF(pad, pad, width - pad, height - pad);
         float radius = capsule.height() * 0.49f;
 
@@ -43,9 +50,10 @@ public final class WidgetRenderer {
         drawGlassBody(c, capsule, radius);
         drawLiquid(c, capsule, radius, progress);
         drawGlassEdges(c, capsule, radius, height);
-        drawMicCapsule(c, width * 0.615f, height * 0.50f, height * 0.285f);
+        float micRadius = Math.min(height * 0.285f, width * 0.055f);
+        drawMicCapsule(c, width * 0.615f, height * 0.50f, micRadius);
         drawDivider(c, width * 0.690f, height);
-        drawStopwatch(c, width * 0.752f, height * 0.50f, height * 0.174f);
+        drawStopwatch(c, width * 0.752f, height * 0.50f, Math.min(height * 0.174f, width * 0.033f));
         drawMicroHighlights(c, capsule, progress, height);
 
         return bitmap;
