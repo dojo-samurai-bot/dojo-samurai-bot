@@ -1,6 +1,6 @@
 package ru.dachafibonacci.glassclockwidget;
 
-import android.app.AlarmClock;
+import android.provider.AlarmClock;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
