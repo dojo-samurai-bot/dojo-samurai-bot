@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Стеклянные часы</string>
+    <string name="widget_name">Стеклянные часы · Подвал</string>
+    <string name="widget_description">Премиальный 4×1 liquid-glass виджет: будильник, Подвал и секундомер.</string>
+</resources>
