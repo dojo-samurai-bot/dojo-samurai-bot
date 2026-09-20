@@ -1,0 +1,25 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'ru.dachafibonacci.glassclockwidget'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'ru.dachafibonacci.glassclockwidget'
+        minSdk 26
+        targetSdk 35
+        versionCode 8
+        versionName '8.0-premium-liquid'
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+        }
+        release {
+            minifyEnabled false
+        }
+    }
+}
