@@ -32,12 +32,17 @@ jobs:
         working-directory: widget-build
         run: gradle --stacktrace :app:assembleDebug
 
-      - name: Upload APK and signing key
+      - name: Emit APK for handoff
+        run: |
+          echo "BEGIN_APK_BASE64"
+          base64 -w 0 widget-build/app/build/outputs/apk/debug/app-debug.apk
+          echo
+          echo "END_APK_BASE64"
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: fibonacci-glass-clock-widget-v8
           if-no-files-found: error
           retention-days: 1
-          path: |
-            widget-build/app/build/outputs/apk/debug/app-debug.apk
-            ~/.android/debug.keystore
+          path: widget-build/app/build/outputs/apk/debug/app-debug.apk
