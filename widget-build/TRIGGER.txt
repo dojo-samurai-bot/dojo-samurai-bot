@@ -5,3 +5,5 @@ retry hosted sdkmanager
 final artifact handoff
 
 v8.2 resizable trigger
+
+v8.3 final sizing/water trigger
