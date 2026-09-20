@@ -21,20 +21,9 @@ public final class WidgetRenderer {
     private WidgetRenderer() {}
 
     public static Bitmap render(Context context, int appWidgetId) {
-        DisplayMetrics dm = context.getResources().getDisplayMetrics();
-        Bundle options = AppWidgetManager.getInstance(context).getAppWidgetOptions(appWidgetId);
-
-        int minWidthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250);
-        int maxWidthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, minWidthDp);
-        int minHeightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 54);
-        int maxHeightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, minHeightDp);
-
-        int widthDp = Math.max(minWidthDp, Math.min(maxWidthDp, 700));
-        int heightDp = Math.max(40, Math.min(Math.max(minHeightDp, maxHeightDp), 220));
-
-        int width = clamp(Math.round(widthDp * dm.density), 480, 1500);
-        int height = clamp(Math.round(heightDp * dm.density), 90, 620);
-        return drawWidget(width, height, progressNow());
+        // Render onto one stable 4×1-ish artboard. The ImageView stretches this bitmap
+        // to the actual host bounds, so the glass edge can never extend past the widget.
+        return drawWidget(600, 114, progressNow());
     }
 
     static Bitmap drawWidget(int width, int height, float progress) {
@@ -93,66 +82,80 @@ public final class WidgetRenderer {
         if (progress <= 0.001f) return;
 
         float fillRight = r.left + r.width() * progress;
+        float edgeWave = Math.max(3f, r.height() * 0.045f);
+
         int save = c.save();
         Path capsulePath = new Path();
         capsulePath.addRoundRect(r, radius, radius, Path.Direction.CW);
         c.clipPath(capsulePath);
-        c.clipRect(r.left, r.top, fillRight, r.bottom);
+
+        // The liquid occupies the full height and advances strictly LEFT -> RIGHT.
+        Path water = new Path();
+        water.moveTo(r.left - 8f, r.top - 8f);
+        water.lineTo(fillRight - edgeWave * 0.30f, r.top - 8f);
+        water.cubicTo(
+                fillRight + edgeWave * 0.45f, r.top + r.height() * 0.22f,
+                fillRight - edgeWave * 0.45f, r.top + r.height() * 0.38f,
+                fillRight + edgeWave * 0.12f, r.top + r.height() * 0.52f
+        );
+        water.cubicTo(
+                fillRight + edgeWave * 0.50f, r.top + r.height() * 0.66f,
+                fillRight - edgeWave * 0.45f, r.top + r.height() * 0.82f,
+                fillRight + edgeWave * 0.05f, r.bottom + 8f
+        );
+        water.lineTo(r.left - 8f, r.bottom + 8f);
+        water.close();
 
         Paint liquid = new Paint(Paint.ANTI_ALIAS_FLAG);
         liquid.setShader(new LinearGradient(
+                r.left, r.top, fillRight, r.bottom,
+                new int[] {0xAA20C8B0, 0xB72ED9BB, 0x9A53EBCB, 0x8A1DB99E},
+                new float[] {0f, 0.40f, 0.74f, 1f},
+                Shader.TileMode.CLAMP));
+        c.drawPath(water, liquid);
+
+        // Gentle internal depth, but no horizontal "water level".
+        Paint depth = new Paint(Paint.ANTI_ALIAS_FLAG);
+        depth.setShader(new LinearGradient(
                 r.left, r.top, r.left, r.bottom,
-                new int[] {0x167FFFE2, 0x3E39E4C0, 0x8841DDB7, 0xB92AC9A8},
-                new float[] {0f, 0.30f, 0.64f, 1f},
+                new int[] {0x42FFFFFF, 0x0FFFFFFF, 0x33008C76},
+                new float[] {0f, 0.48f, 1f},
                 Shader.TileMode.CLAMP));
-        c.drawRect(r.left, r.top, fillRight, r.bottom, liquid);
+        c.drawPath(water, depth);
 
-        float baseY = r.top + r.height() * 0.51f;
-        float amp = r.height() * 0.075f;
-        Path wave = new Path();
-        wave.moveTo(r.left - 10, baseY + amp * 0.15f);
-        float span = Math.max(1f, fillRight - r.left);
-        float x1 = r.left + span * 0.33f;
-        float x2 = r.left + span * 0.67f;
-        wave.cubicTo(r.left + span * 0.16f, baseY - amp,
-                r.left + span * 0.23f, baseY + amp,
-                x1, baseY + amp * 0.25f);
-        wave.cubicTo(r.left + span * 0.46f, baseY - amp * 0.72f,
-                r.left + span * 0.56f, baseY + amp * 0.88f,
-                x2, baseY - amp * 0.08f);
-        wave.cubicTo(r.left + span * 0.80f, baseY - amp * 0.70f,
-                r.left + span * 0.90f, baseY + amp * 0.65f,
-                fillRight + 8, baseY + amp * 0.05f);
-        wave.lineTo(fillRight + 8, r.bottom + 10);
-        wave.lineTo(r.left - 10, r.bottom + 10);
-        wave.close();
+        // Bright vertical meniscus makes the direction unambiguous.
+        Paint meniscus = new Paint(Paint.ANTI_ALIAS_FLAG);
+        meniscus.setStyle(Paint.Style.STROKE);
+        meniscus.setStrokeWidth(Math.max(2f, r.height() * 0.020f));
+        meniscus.setStrokeCap(Paint.Cap.ROUND);
+        meniscus.setColor(0xD89EFFF0);
+        meniscus.setMaskFilter(new BlurMaskFilter(r.height() * 0.014f, BlurMaskFilter.Blur.NORMAL));
 
-        Paint deep = new Paint(Paint.ANTI_ALIAS_FLAG);
-        deep.setShader(new LinearGradient(
-                r.left, baseY - amp, r.left, r.bottom,
-                new int[] {0x5830E7C5, 0xB32BC5A4},
-                null,
-                Shader.TileMode.CLAMP));
-        c.drawPath(wave, deep);
+        Path edge = new Path();
+        edge.moveTo(fillRight - edgeWave * 0.30f, r.top + 2f);
+        edge.cubicTo(
+                fillRight + edgeWave * 0.45f, r.top + r.height() * 0.22f,
+                fillRight - edgeWave * 0.45f, r.top + r.height() * 0.38f,
+                fillRight + edgeWave * 0.12f, r.top + r.height() * 0.52f
+        );
+        edge.cubicTo(
+                fillRight + edgeWave * 0.50f, r.top + r.height() * 0.66f,
+                fillRight - edgeWave * 0.45f, r.top + r.height() * 0.82f,
+                fillRight + edgeWave * 0.05f, r.bottom - 2f
+        );
+        c.drawPath(edge, meniscus);
+        meniscus.setMaskFilter(null);
 
-        Paint surfaceGlow = new Paint(Paint.ANTI_ALIAS_FLAG);
-        surfaceGlow.setStyle(Paint.Style.STROKE);
-        surfaceGlow.setStrokeWidth(Math.max(2f, r.height() * 0.018f));
-        surfaceGlow.setColor(0xC48CFFF0);
-        surfaceGlow.setMaskFilter(new BlurMaskFilter(r.height() * 0.018f, BlurMaskFilter.Blur.NORMAL));
-        Path line = new Path();
-        line.moveTo(r.left - 4, baseY + amp * 0.15f);
-        line.cubicTo(r.left + span * 0.16f, baseY - amp,
-                r.left + span * 0.23f, baseY + amp,
-                x1, baseY + amp * 0.25f);
-        line.cubicTo(r.left + span * 0.46f, baseY - amp * 0.72f,
-                r.left + span * 0.56f, baseY + amp * 0.88f,
-                x2, baseY - amp * 0.08f);
-        line.cubicTo(r.left + span * 0.80f, baseY - amp * 0.70f,
-                r.left + span * 0.90f, baseY + amp * 0.65f,
-                fillRight + 4, baseY + amp * 0.05f);
-        c.drawPath(line, surfaceGlow);
-        surfaceGlow.setMaskFilter(null);
+        // Thin highlights travel inside the filled region only.
+        Paint sheen = new Paint(Paint.ANTI_ALIAS_FLAG);
+        sheen.setStrokeWidth(Math.max(1f, r.height() * 0.009f));
+        sheen.setColor(0x55FFFFFF);
+        sheen.setStrokeCap(Paint.Cap.ROUND);
+        float sheenEnd = Math.max(r.left + 8f, fillRight - edgeWave * 1.3f);
+        c.drawLine(r.left + radius * 0.55f, r.top + r.height() * 0.29f,
+                sheenEnd, r.top + r.height() * 0.29f, sheen);
+        c.drawLine(r.left + radius * 0.70f, r.top + r.height() * 0.72f,
+                sheenEnd, r.top + r.height() * 0.72f, sheen);
 
         c.restoreToCount(save);
     }
