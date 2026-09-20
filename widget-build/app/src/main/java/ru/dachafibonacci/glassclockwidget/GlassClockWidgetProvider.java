@@ -7,6 +7,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.util.TypedValue;
 import android.widget.RemoteViews;
 
 public class GlassClockWidgetProvider extends AppWidgetProvider {
@@ -50,6 +51,22 @@ public class GlassClockWidgetProvider extends AppWidgetProvider {
         Bitmap artwork = WidgetRenderer.render(context, appWidgetId);
         views.setImageViewBitmap(R.id.widget_art, artwork);
 
+        android.os.Bundle options = manager.getAppWidgetOptions(appWidgetId);
+        int minHeightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 54);
+        int maxHeightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, minHeightDp);
+        int heightDp = Math.max(40, Math.min(Math.max(minHeightDp, maxHeightDp), 220));
+
+        float timeSp = clamp(heightDp * 0.68f, 30f, 62f);
+        float dateSp = clamp(heightDp * 0.19f, 11f, 18f);
+        int vPad = Math.max(2, Math.round(heightDp * 0.06f));
+        int sidePad = Math.max(10, Math.round(heightDp * 0.18f));
+        int dateLeft = Math.max(30, Math.round(heightDp * 0.42f));
+
+        views.setTextViewTextSize(R.id.time_text, TypedValue.COMPLEX_UNIT_SP, timeSp);
+        views.setTextViewTextSize(R.id.date_text, TypedValue.COMPLEX_UNIT_SP, dateSp);
+        views.setViewPadding(R.id.content_row, sidePad, vPad, sidePad, vPad);
+        views.setViewPadding(R.id.date_text, dateLeft, 0, 0, 0);
+
         views.setOnClickPendingIntent(R.id.zone_left,
                 actionPendingIntent(context, WidgetActionReceiver.ACTION_ALARM, appWidgetId * 10 + 1));
         views.setOnClickPendingIntent(R.id.zone_center,
@@ -58,6 +75,10 @@ public class GlassClockWidgetProvider extends AppWidgetProvider {
                 actionPendingIntent(context, WidgetActionReceiver.ACTION_STOPWATCH, appWidgetId * 10 + 3));
 
         manager.updateAppWidget(appWidgetId, views);
+    }
+
+    private static float clamp(float value, float min, float max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private static PendingIntent actionPendingIntent(Context context, String action, int requestCode) {
