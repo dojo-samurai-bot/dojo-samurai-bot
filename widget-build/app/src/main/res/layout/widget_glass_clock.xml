@@ -3,13 +3,14 @@
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:clipChildren="false"
-    android:clipToPadding="false">
+    android:clipChildren="true"
+    android:clipToPadding="true">
 
     <ImageView
         android:id="@+id/widget_art"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:adjustViewBounds="false"
         android:contentDescription="@string/widget_name"
         android:scaleType="fitXY" />
 
@@ -18,33 +19,38 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="horizontal"
-        android:paddingLeft="18dp"
-        android:paddingRight="16dp"
-        android:paddingTop="5dp"
-        android:paddingBottom="5dp">
+        android:paddingLeft="8dp"
+        android:paddingRight="8dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp">
 
         <FrameLayout
             android:id="@+id/zone_left"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="54">
+            android:layout_weight="52">
 
             <TextClock
                 android:id="@+id/time_text"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
+                android:autoSizeMaxTextSize="46sp"
+                android:autoSizeMinTextSize="24sp"
+                android:autoSizeStepGranularity="1sp"
+                android:autoSizeTextType="uniform"
                 android:fontFamily="sans-serif-condensed"
                 android:format12Hour="HH:mm"
                 android:format24Hour="HH:mm"
                 android:gravity="center_vertical|start"
                 android:includeFontPadding="false"
                 android:letterSpacing="-0.025"
-                android:shadowColor="#7A000000"
+                android:maxLines="1"
+                android:shadowColor="#72000000"
                 android:shadowDx="0"
-                android:shadowDy="4"
-                android:shadowRadius="7"
-                android:textColor="#F5FFF9"
-                android:textSize="55sp"
+                android:shadowDy="2"
+                android:shadowRadius="4"
+                android:textColor="#F7FFF9"
+                android:textSize="40sp"
                 android:textStyle="bold" />
         </FrameLayout>
 
@@ -52,19 +58,29 @@
             android:id="@+id/zone_center"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="15" />
+            android:layout_weight="16" />
 
-        <FrameLayout
+        <LinearLayout
             android:id="@+id/zone_right"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="31">
+            android:layout_weight="32"
+            android:orientation="horizontal">
+
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="35" />
 
             <TextClock
                 android:id="@+id/date_text"
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:paddingLeft="48dp"
+                android:layout_weight="65"
+                android:autoSizeMaxTextSize="15sp"
+                android:autoSizeMinTextSize="8sp"
+                android:autoSizeStepGranularity="1sp"
+                android:autoSizeTextType="uniform"
                 android:fontFamily="sans-serif"
                 android:format12Hour="EEE, d MMM.&#10;yyyy"
                 android:format24Hour="EEE, d MMM.&#10;yyyy"
@@ -74,11 +90,11 @@
                 android:maxLines="2"
                 android:shadowColor="#65000000"
                 android:shadowDx="0"
-                android:shadowDy="2"
-                android:shadowRadius="4"
-                android:textColor="#F3FFF8"
-                android:textSize="16sp"
+                android:shadowDy="1"
+                android:shadowRadius="2"
+                android:textColor="#F5FFF8"
+                android:textSize="13sp"
                 android:textStyle="bold" />
-        </FrameLayout>
+        </LinearLayout>
     </LinearLayout>
 </FrameLayout>
