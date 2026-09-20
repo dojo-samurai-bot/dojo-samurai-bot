@@ -3,3 +3,5 @@ retry after workflow fix
 retry hosted sdkmanager
 
 final artifact handoff
+
+v8.2 resizable trigger
