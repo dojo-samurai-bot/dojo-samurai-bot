@@ -1,0 +1,339 @@
+name: Build Nash Mir v0.10.3 widget footer expense
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct source and apply all patches
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat v061-source/part-{00,01,02,03} > v061.tar.xz.b64
+          base64 -d v061.tar.xz.b64 > v061.tar.xz
+          echo "303dab18c9c2989fe64a558af4131499c642a8141a8ee2451558a52b0a49169e  v061.tar.xz" | sha256sum -c -
+          tar -xJf v061.tar.xz
+
+          cat v070-sync-patch-b64/part-{00,01,02} > sync.xz.b64
+          base64 -d sync.xz.b64 > sync.xz
+          xz -dc sync.xz > sync.patch
+
+          cp -a dacha-v061-project dacha-v070-project
+          cd dacha-v070-project
+          git init -q
+          git add .
+          git -c user.email=ci@dachafibonacci.local -c user.name=CI commit -qm baseline
+          git apply ../sync.patch
+          git add .
+          git -c user.email=ci@dachafibonacci.local -c user.name=CI commit -qm sync
+          cd ..
+
+          cat v070-room-patch-safe/part-{00,01,02,03} > room.xz.b64
+          base64 -d room.xz.b64 > room.xz
+          xz -dc room.xz > room.patch
+          cd dacha-v070-project
+          git apply ../room.patch
+          sed -i 's/^android.useAndroidX=false$/android.useAndroidX=true/' gradle.properties
+          mkdir -p app/schemas
+          git add .
+          git -c user.email=ci@dachafibonacci.local -c user.name=CI commit -qm room
+          cd ..
+
+          cat v070-test-fixes-b64/part-00 > fixes.xz.b64
+          test "$(wc -c < fixes.xz.b64)" -eq 3036
+          echo "d4f71f286d33b66b6a0b9293b94debc465ea8b051f72a5ef8efe285ea24d7c1c  fixes.xz.b64" | sha256sum -c -
+          base64 -d fixes.xz.b64 > fixes.xz
+          echo "0b801e3d341786c7747f9da369b7535969568d72151bdd6675019d8261004bd4  fixes.xz" | sha256sum -c -
+          xz -dc fixes.xz > fixes.patch
+          echo "c2018e1c673d1b8ea3b7caff9a548e19c81f8aedfcee53d4701a2b38f076dfee  fixes.patch" | sha256sum -c -
+          cd dacha-v070-project
+          git apply ../fixes.patch
+          cd ..
+
+          cat v070-sync-transport-fix-b64/part-00 > transport.xz.b64
+          test "$(wc -c < transport.xz.b64)" -eq 2808
+          echo "43cc2b13e98039181deeef237fb5cfc6b82445b0ffc14f2b65c46fdd365bcba8  transport.xz.b64" | sha256sum -c -
+          base64 -d transport.xz.b64 > transport.xz
+          echo "627b157d433831b5e07d6b63f2efdb98d7ebe367c104ba959152dfd712f438c9  transport.xz" | sha256sum -c -
+          xz -dc transport.xz > transport.patch
+          echo "f178fe32141ea696e3108fb45c26cf9c4ddc0677ef7c31f2f7520dbd3c0bda06  transport.patch" | sha256sum -c -
+          cd dacha-v070-project
+          git apply ../transport.patch
+          cd ..
+
+          cat v072-ui-performance-fix-b64/part-00 > v072-fix.xz.b64
+          test "$(wc -c < v072-fix.xz.b64)" -eq 7100
+          echo "cd0835ccbd4a04162a969b32db78eb92adf935529632553e282269e3b5fd3f0b  v072-fix.xz.b64" | sha256sum -c -
+          base64 -d v072-fix.xz.b64 > v072-fix.xz
+          echo "b0b9b156622b7b53275e861183fe18b6104c9e8f085c0665907b63617f345a25  v072-fix.xz" | sha256sum -c -
+          xz -dc v072-fix.xz > v072-fix.patch
+          echo "22957ea30f1ae3e7455c3ff7355281d270d11d1b42a85c3cea4fb5e87b63dc41  v072-fix.patch" | sha256sum -c -
+          cd dacha-v070-project
+          git apply ../v072-fix.patch
+          cd ..
+
+          cat v073-widget-notification-fix-b64/part-00 > v073-fix.xz.b64
+          test "$(wc -c < v073-fix.xz.b64)" -eq 9352
+          echo "9ba76dea0b2346e2c16d892d59f6f1ddbaf16b618a8277a2c87ec27677195220  v073-fix.xz.b64" | sha256sum -c -
+          base64 -d v073-fix.xz.b64 > v073-fix.xz
+          echo "96091d5d927aab87b3fc34ba4c3a0fefad84351e4ec5c8541ed8b90fd48da26f  v073-fix.xz" | sha256sum -c -
+          xz -dc v073-fix.xz > v073-fix.patch
+          echo "6dfe0a810fdc19958b88a48f2a60498508eb3d6180dc2aba367d8b5fe83a8d49  v073-fix.patch" | sha256sum -c -
+          cd dacha-v070-project
+          git apply ../v073-fix.patch
+          cd ..
+
+          cat v074-final-b64/part-{00,01,02,03,04} > v074-fix.xz.b64
+          test "$(wc -c < v074-fix.xz.b64)" -eq 99816
+          echo "c8c173b05ec512914116d03642b6ea69b381d377168ddca7343237fddbc4702f  v074-fix.xz.b64" | sha256sum -c -
+          base64 -d v074-fix.xz.b64 > v074-fix.xz
+          echo "7c183419187073737fa5dbd373e861b3fc25b0df63df655ff3c2faa606266d75  v074-fix.xz" | sha256sum -c -
+          xz -dc v074-fix.xz > v074-fix.patch
+          echo "8ad1bb0e0d02fc89c09ab270c7ed0971fe5554a2f34ef06325c57877422c6c73  v074-fix.patch" | sha256sum -c -
+          cd dacha-v070-project
+          git apply ../v074-fix.patch
+          cd ..
+
+          cat v080-booking-calendar-b64/part-{00,01} > v080-fix.xz.b64
+          test "$(wc -c < v080-fix.xz.b64)" -eq 20184
+          echo "ac757c8bd533ee08c40b15a076944b8d301b0f95819898f3c889e1af04fb6ba6  v080-fix.xz.b64" | sha256sum -c -
+          base64 -d v080-fix.xz.b64 > v080-fix.xz
+          echo "223af8b4b9b4fb38c27abb693d915486debdba313f43cbfa06375498fb2f994d  v080-fix.xz" | sha256sum -c -
+          xz -dc v080-fix.xz > v080-fix.patch
+          echo "8c02783dbe5dcfbf8964eef782b4d33dbdf2f1f99d5a6a25d50a24a702606993  v080-fix.patch" | sha256sum -c -
+          cd dacha-v070-project
+          git apply ../v080-fix.patch
+          cd ..
+
+          cat v081-prepayment-flow-b64/part-00 > v081-fix.xz.b64
+          test "$(wc -c < v081-fix.xz.b64)" -eq 8956
+          echo "598b6ded26d292bc8f28508fb3c95132ff321fb888e2cd37002b46af334ceb4f  v081-fix.xz.b64" | sha256sum -c -
+          base64 -d v081-fix.xz.b64 > v081-fix.xz
+          echo "2ba70e2e8f928323b004471d150d7d1f3907d0b6a29f176012a5aaa069f1403f  v081-fix.xz" | sha256sum -c -
+          xz -dc v081-fix.xz > v081-fix.patch
+          echo "5e1d3e4aa496fa4a58ce421a06758408452e22cb3f1d935f7a54df5eb389c8d7  v081-fix.patch" | sha256sum -c -
+          cd dacha-v070-project
+          git apply ../v081-fix.patch
+          cd ..
+
+          cat v082-arrival-checklist-b64/part-00 > v082-fix.xz.b64
+          test "$(wc -c < v082-fix.xz.b64)" -eq 9424
+          echo "d0315f731d7b1eb983d1bddba44243061fb687d2269b93092dd303e8460b39a7  v082-fix.xz.b64" | sha256sum -c -
+          base64 -d v082-fix.xz.b64 > v082-fix.xz
+          echo "6f0fabe8d314072a1c60239929c15c5d0cfc98bdc6c35085be14d78884860aa9  v082-fix.xz" | sha256sum -c -
+          xz -dc v082-fix.xz > v082-fix.patch
+          echo "e6d4f0aa3d9086a76d2a091a2f2646d40650c3e923e78a4ac17c6f224f7eb889  v082-fix.patch" | sha256sum -c -
+          cd dacha-v070-project
+          git apply ../v082-fix.patch
+          cd ..
+
+          cat v090-crm-finance-b64/part-{00,01} > v090-files.tar.xz.b64
+          test "$(wc -c < v090-files.tar.xz.b64)" -eq 78245
+          echo "ffca551a6de12ba6112f712f0c9770b3329fed43e4466f4c5a6050af9cc1df24  v090-files.tar.xz.b64" | sha256sum -c -
+          base64 -d v090-files.tar.xz.b64 > v090-files.tar.xz
+          echo "06e2487634bac2a57e8fff0a0a3fe3b743b518e4595afc074ebfb52f08fde920  v090-files.tar.xz" | sha256sum -c -
+          tar -xJf v090-files.tar.xz -C dacha-v070-project
+
+          cat v091-guest-dedupe-fix-b64/part-{00,01} > v091-files.tar.xz.b64
+          test "$(wc -c < v091-files.tar.xz.b64)" -eq 55554
+          echo "f232c56cdcef8cee59bd282465c943c28438d0b9bb31c2e4fb8a862d366f6a79  v091-files.tar.xz.b64" | sha256sum -c -
+          base64 -d v091-files.tar.xz.b64 > v091-files.tar.xz
+          echo "aba024e354528c14ac1a12ca499d2c1f158ecfec3ae6da0572b7582e514a54de  v091-files.tar.xz" | sha256sum -c -
+          tar -xJf v091-files.tar.xz -C dacha-v070-project
+
+          cat v092-booking-discount-b64/part-{00,01} > v092-files.tar.xz.b64
+          test "$(wc -c < v092-files.tar.xz.b64)" -eq 64855
+          echo "3faf7047515a3011856b56c566cb4fbbab4da8b8fece30df0427968e81d6161a  v092-files.tar.xz.b64" | sha256sum -c -
+          base64 -d v092-files.tar.xz.b64 > v092-files.tar.xz
+          echo "ed622bec37fc5f9e74394f203be8432d9d342109125dfc00c088c42d830a2f50  v092-files.tar.xz" | sha256sum -c -
+          tar -xJf v092-files.tar.xz -C dacha-v070-project
+
+          cat v093-payment-confirm-b64/part-{00,01} > v093-files.tar.xz.b64
+          test "$(wc -c < v093-files.tar.xz.b64)" -eq 64908
+          echo "6bd6cab4388c36c5a4512307a67bfaf6b342731397dd8acf5b9655677fb20914  v093-files.tar.xz.b64" | sha256sum -c -
+          base64 -d v093-files.tar.xz.b64 > v093-files.tar.xz
+          echo "16a5a5b062c03b28b1359f217aff9da034f4e800594474d9bad2ed08ec1174cc  v093-files.tar.xz" | sha256sum -c -
+          tar -xJf v093-files.tar.xz -C dacha-v070-project
+
+          cat v100-separate-widgets-b64/part-{00,01} > v100-files.tar.xz.b64
+          test "$(wc -c < v100-files.tar.xz.b64)" -eq 75868
+          echo "c3baeeb6871c83a7e055325735fac8e7c0e52d4ac91e98af389472a39e381ce8  v100-files.tar.xz.b64" | sha256sum -c -
+          base64 -d v100-files.tar.xz.b64 > v100-files.tar.xz
+          echo "30d6cfdaf7ec9869edd4af348061ce953de9a5d5d69dcd65c19a69078c080513  v100-files.tar.xz" | sha256sum -c -
+          tar -xJf v100-files.tar.xz -C dacha-v070-project
+
+          cat v101-sync-reliability-b64/part-{00,01} > v101-files.tar.xz.b64
+          test "$(wc -c < v101-files.tar.xz.b64)" -eq 60384
+          echo "a0deaede63bda358de909f6dbb5f9fbd98acbd6a924efae7827e49b4eed4ba0f  v101-files.tar.xz.b64" | sha256sum -c -
+          base64 -d v101-files.tar.xz.b64 > v101-files.tar.xz
+          echo "564aa811a0edc70fef392a1ec859733f6668f4bd350212c8c1bae0fbc39dabb4  v101-files.tar.xz" | sha256sum -c -
+          tar -xJf v101-files.tar.xz -C dacha-v070-project
+
+          cat v102-shopping-expense-b64/part-{00,01} > v102-files.tar.xz.b64
+          test "$(wc -c < v102-files.tar.xz.b64)" -eq 61596
+          echo "32c69d929a1f2316ce9e2a0e246b169413a510fc221f965dd675a27f3ac45d81  v102-files.tar.xz.b64" | sha256sum -c -
+          base64 -d v102-files.tar.xz.b64 > v102-files.tar.xz
+          echo "3808bf86c1540afe4d9d158765f0f4b0b7a4213640499dca205dda1ce9ae4c87  v102-files.tar.xz" | sha256sum -c -
+          tar -xJf v102-files.tar.xz -C dacha-v070-project
+
+          cat v103-widget-footer-expense-b64/part-{00,01} > v103-files.tar.xz.b64
+          test "$(wc -c < v103-files.tar.xz.b64)" -eq 64760
+          echo "bc8bdf8d3949f5b5716a4cdeb015db372e04016e11aeeb3f3fcfe86be7d386d5  v103-files.tar.xz.b64" | sha256sum -c -
+          base64 -d v103-files.tar.xz.b64 > v103-files.tar.xz
+          echo "7f77e24a9ab84d1ca46b47c8e3ce0c3613bcda80d70bc99a6e70fda7029120ac  v103-files.tar.xz" | sha256sum -c -
+          tar -xJf v103-files.tar.xz -C dacha-v070-project
+
+      - name: Validate fixed source
+        shell: bash
+        run: |
+          set -euo pipefail
+          R=dacha-v070-project
+          node --check "$R/app/src/main/assets/www/app.js"
+          node --check "$R/app/src/main/assets/www/db.js"
+          node --check "$R/app/src/main/assets/www/sync.js"
+          node --check "$R/app/src/main/assets/www/sw.js"
+          grep -Fq 'SCHEDULE_EXACT_ALARM' "$R/app/src/main/AndroidManifest.xml"
+          grep -Fq 'setExactAndAllowWhileIdle' "$R/app/src/main/java/ru/dachafibonacci/manager/NotificationScheduler.java"
+          grep -Fq '.commit();' "$R/app/src/main/java/ru/dachafibonacci/manager/data/WidgetSnapshotRepository.java"
+          grep -Fq 'name="repeat"' "$R/app/src/main/assets/www/app.js"
+          grep -Fq "task.repeat === 'weekly'" "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'syncRequest(String requestId, String endpoint, String requestJson)' "$R/app/src/main/java/ru/dachafibonacci/manager/WidgetBridge.java"
+          grep -Fq "window.AndroidBridge.syncRequest" "$R/app/src/main/assets/www/sync.js"
+          grep -Fq 'sendPostBody = false;' "$R/app/src/main/java/ru/dachafibonacci/manager/WidgetBridge.java"
+          grep -Fq 'window.DachaNativeSync' "$R/app/src/main/assets/www/sync.js"
+          grep -Fq '.detail-dialog[open] { display: flex; flex-direction: column; }' "$R/app/src/main/assets/www/styles.css"
+          grep -Fq 'id="confirmDialog"' "$R/app/src/main/assets/www/index.html"
+          ! grep -Fq 'confirm(' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'id="@+id/widget_row_complete"' "$R/app/src/main/res/layout/dacha_today_widget_row.xml"
+          grep -Fq 'COMMAND_COMPLETE_ITEM' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaListWidgetProvider.java"
+          grep -Fq 'EXTRA_ITEM_STORE' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaTodayWidgetService.java"
+          grep -Fq 'MODE_SHOPPING' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaTodayWidgetService.java"
+          grep -Fq 'completeItemFromWidget' "$R/app/src/main/java/ru/dachafibonacci/manager/data/RoomStore.java"
+          grep -Fq '"tasks".equals(storeName) && !"shopping".equals(storeName)' "$R/app/src/main/java/ru/dachafibonacci/manager/data/RoomStore.java"
+          grep -Fq '.put("status", "pending")' "$R/app/src/main/java/ru/dachafibonacci/manager/data/RoomStore.java"
+          grep -Fq 'sendTestNotification' "$R/app/src/main/java/ru/dachafibonacci/manager/NotificationScheduler.java"
+          grep -Fq 'areNotificationsEnabled()' "$R/app/src/main/java/ru/dachafibonacci/manager/NotificationScheduler.java"
+          grep -Fq 'id="testNotificationButton"' "$R/app/src/main/assets/www/index.html"
+          grep -Fq 'onAppResume() { refreshData(); queueSync(250);' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'android:label="Наш мир"' "$R/app/src/main/AndroidManifest.xml"
+          grep -Fq '<title>Наш мир</title>' "$R/app/src/main/assets/www/index.html"
+          grep -Fq 'function renderBookingCalendar' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'function bookingRangeConflict' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'Дата выезда считается занятой полностью' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'paymentStatuses:' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'function transactionIsCashIncome' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'function bookingPrepaymentPlan' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'data-confirm-prepayment' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'prepaymentAllToPlatform' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'prepaymentPlatformAmount' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'Осталось взять с гостя' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'const ARRIVAL_CHECKLIST' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'Отправить гостю все сообщения в чат' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'Проверить всё перед заездом' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'data-checklist-item' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'function ensureArrivalWorkflowTasks' "$R/app/src/main/assets/www/app.js"
+          grep -Fq '.arrival-checklist' "$R/app/src/main/assets/www/styles.css"
+          grep -Fq 'accommodationAmount' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'data-open-payment-for' "$R/app/src/main/assets/www/app.js"
+          grep -Fq '.booking-calendar-day.booked' "$R/app/src/main/assets/www/styles.css"
+          grep -Fq "versionName '0.10.3'" "$R/app/build.gradle"
+          grep -Fq "versionCode 26" "$R/app/build.gradle"
+          grep -Fq 'widget_today_add_expense' "$R/app/src/main/res/layout/dacha_today_widget.xml"
+          grep -Fq 'R.id.widget_today_add_expense' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaListWidgetProvider.java"
+          ! grep -Fq 'widget_row_expense' "$R/app/src/main/res/layout/dacha_today_widget_row.xml"
+          grep -Fq 'resolveVersionConflict' "$R/app/src/main/assets/www/sync.js"
+          grep -Fq 'recoverStoredConflicts' "$R/app/src/main/assets/www/sync.js"
+          grep -Fq 'refreshGuestBookingMirrors' "$R/app/src/main/assets/www/sync.js"
+          grep -Fq 'redirect < 15' "$R/app/src/main/java/ru/dachafibonacci/manager/WidgetBridge.java"
+          grep -Fq 'CookieManager' "$R/app/src/main/java/ru/dachafibonacci/manager/WidgetBridge.java"
+          grep -Fq "'guests'" "$R/app/src/main/assets/www/db.js"
+          grep -Fq "function renderGuests" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "function migrateBookingGuests" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "function normalizePhone" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "function migratedGuestId" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "function consolidateGuestDuplicates" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "function bookingDiscountAmount" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "discountPercent" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "Скидка гостю, %" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "data-confirm-expected-payment" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "data-confirm-booking-remaining" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "Такой ожидаемый платёж уже добавлен" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "data-confirm-booking-deposit" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "Депозит отмечен на руках" "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'autoTaskType: '\''depositReturn'\''' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'function taskCategoryTone' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'task-colored' "$R/app/src/main/assets/www/app.js"
+          grep -Fq 'ACTION_TOGGLE_COLOR_SORT' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaListWidgetProvider.java"
+          grep -Fq 'DachaShoppingWidgetProvider' "$R/app/src/main/AndroidManifest.xml"
+          grep -Fq 'DachaBookingsWidgetProvider' "$R/app/src/main/AndroidManifest.xml"
+          grep -Fq 'widget_task_tone_6' "$R/app/src/main/java/ru/dachafibonacci/manager/DachaTodayWidgetService.java"
+          grep -Fq "financeSettings" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "premiumOffers" "$R/app/src/main/assets/www/app.js"
+          grep -Fq "'guests'" "$R/server/apps-script/Code.gs"
+          echo "61b93e2ea570a1db9eb88b93d21e4277de4198dd45f1fd0968cbae521cde4142  $R/app/src/main/assets/www/icons/icon-512.png" | sha256sum -c -
+          echo "e6264bb81f0f1adc8be00bd88b4906d1c5cf08d8e693fb10d3a62791f9aad9f8  $R/app/src/main/assets/www/icons/icon-192.png" | sha256sum -c -
+          echo "61b93e2ea570a1db9eb88b93d21e4277de4198dd45f1fd0968cbae521cde4142  $R/app/src/main/res/drawable/app_icon.png" | sha256sum -c -
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+
+      - name: Build APKs
+        working-directory: dacha-v070-project
+        run: gradle :app:assembleDebug :app:assembleRelease --stacktrace --no-daemon
+
+      - name: Validate and package APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEBUG=dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
+          RELEASE=dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
+          ALIGNED=dacha-v070-project/app/build/outputs/apk/release/nash-mir-v103-aligned-unsigned.apk
+          test -s "$DEBUG"
+          test -s "$RELEASE"
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -f -p 4 "$RELEASE" "$ALIGNED"
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -p -v 4 "$ALIGNED" > fixed-release-alignment.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$DEBUG" > fixed-badging.txt
+          grep -Fq "package: name='ru.dachafibonacci.manager'" fixed-badging.txt
+          grep -Fq "versionName='0.10.3'" fixed-badging.txt
+          grep -Fq "versionCode='26'" fixed-badging.txt
+          grep -Fq "application-label:'Наш мир'" fixed-badging.txt
+          grep -Fq 'Verification successful' fixed-release-alignment.txt
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" apksigner.jar
+          sha256sum "$DEBUG" "$RELEASE" "$ALIGNED" apksigner.jar > fixed-sha256.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nash-mir-v103-widget-footer-expense
+          path: |
+            dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
+            dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
+            dacha-v070-project/app/build/outputs/apk/release/nash-mir-v103-aligned-unsigned.apk
+            apksigner.jar
+            fixed-badging.txt
+            fixed-sha256.txt
+            fixed-release-alignment.txt
+          if-no-files-found: error
+          retention-days: 7
