@@ -1,0 +1,105 @@
++898,9 @@
+       ${formInput('title', 'Что купить', 'text', data.title || '', 'required maxlength="90" autofocus')}
+       <div class="field-row">${formInput('quantity', 'Количество или уточнение', 'text', data.quantity || '', 'maxlength="120" placeholder="Например, 2 пачки"')}${formInput('plannedDate', 'К какому дню', 'date', data.plannedDate || todayISO())}</div>`;
+ 
++    if (type === 'idea') return `
++      ${formInput('title', 'Идея', 'text', data.title || '', 'required maxlength="180" autofocus placeholder="Что можно сделать или улучшить"')}`;
++
+     if (type === 'booking') return `
+       <div class="field-row"><label>Источник<select name="source">${categories.sources.map(x => `<option ${data.source === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label><label>Статус<select name="status">${Object.entries(categories.statuses).map(([key, label]) => `<option value="${key}" ${(data.status || 'confirmed') === key ? 'selected' : ''}>${label}</option>`).join('')}</select></label></div>
+       ${formInput('guestsCount', 'Количество гостей', 'number', data.guestsCount || 2, 'min="1" max="20"')}
+@@ -926,6 +953,16 @@
+       });
+     }
+ 
++    if (state.formType === 'idea') {
++      const title = String(obj.title || '').trim();
++      if (!title) throw new Error('Напиши идею');
++      const existing = state.editingId ? await DB.get('ideas', state.editingId) : null;
++      await putShared('ideas', {
++        id: state.editingId || uid('idea'), title,
++        createdAt: existing?.createdAt || now, updatedAt: now, updatedBy: user,
++      });
++    }
++
+     if (state.formType === 'booking') {
+       const guestName = String(obj.guestName || '').trim();
+       if (!guestName) throw new Error('Укажи имя гостя');
+@@ -1073,7 +1110,7 @@
+   }
+ 
+   function openDetail(store, id) {
+-    const item = ({ tasks: getTask, shopping: getShopping, bookings: getBooking, transactions: getTransaction })[store]?.(id);
++    const item = ({ tasks: getTask, shopping: getShopping, bookings: getBooking, transactions: getTransaction, ideas: getIdea })[store]?.(id);
+     if (!item) { showToast('Запись не найдена'); return; }
+     state.detail = { store, id };
+     const rendered = renderDetail(store, item);
+@@ -1111,6 +1148,16 @@
+         actions: `<button class="button primary" data-detail-action="edit" type="button">Изменить</button><button class="button secondary" data-detail-action="toggle" type="button">${item.completed ? 'Вернуть в список' : 'Куплено'}</button><button class="button danger" data-detail-action="delete" type="button">Удалить</button>`,
+       };
+     }
++    if (store === 'ideas') {
++      return {
++        title: 'Идея',
++        content: `<h3 class="detail-heading">${escapeHtml(item.title)}</h3><p class="detail-subtitle">Кубышка идей</p><div class="detail-grid">
++          ${detailField('Добавил', item.updatedBy || '—')}
++          ${detailField('Обновлено', item.updatedAt ? new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(item.updatedAt)) : '—')}
++        </div>`,
++        actions: `<button class="button primary" data-detail-action="edit" type="button">Изменить</button><button class="button danger" data-detail-action="delete" type="button">Удалить</button>`,
++      };
++    }
+     if (store === 'bookings') {
+       const f = bookingFinancials(item.id, item.totalAmount);
+       return {
+@@ -1154,10 +1201,10 @@
+       const action = btn.dataset.detailAction;
+       const detail = state.detail;
+       if (!detail) return;
+-      const item = ({ tasks: getTask, shopping: getShopping, bookings: getBooking, transactions: getTransaction })[detail.store]?.(detail.id);
++      const item = ({ tasks: getTask, shopping: getShopping, bookings: getBooking, transactions: getTransaction, ideas: getIdea })[detail.store]?.(detail.id);
+       if (!item) return;
+       if (action === 'edit') {
+-        const type = detail.store === 'tasks' ? 'task' : detail.store === 'shopping' ? 'shopping' : detail.store === 'bookings' ? 'booking' : item.kind;
++        const type = detail.store === 'tasks' ? 'task' : detail.store === 'shopping' ? 'shopping' : detail.store === 'ideas' ? 'idea' : detail.store === 'bookings' ? 'booking' : item.kind;
+         openForm(type, item);
+       }
+       if (action === 'toggle') {
+@@ -1184,11 +1231,13 @@
+     document.querySelectorAll('[data-delete]').forEach(btn => btn.addEventListener('click', event => { event.stopPropagation(); safeAction(() => deleteEntity(btn.dataset.delete)); }));
+     document.querySelectorAll('[data-edit-task]').forEach(btn => btn.addEventListener('click', event => { event.stopPropagation(); openForm('task', getTask(btn.dataset.editTask)); }));
+     document.querySelectorAll('[data-edit-shopping]').forEach(btn => btn.addEventListener('click', event => { event.stopPropagation(); openForm('shopping', getShopping(btn.dataset.editShopping)); }));
++    document.querySelectorAll('[data-edit-idea]').forEach(btn => btn.addEventListener('click', event => { event.stopPropagation(); openForm('idea', getIdea(btn.dataset.editIdea)); }));
+     document.querySelectorAll('[data-edit-booking]').forEach(btn => btn.addEventListener('click', event => { event.stopPropagation(); openForm('booking', getBooking(btn.dataset.editBooking)); }));
+     document.querySelectorAll('[data-edit-transaction]').forEach(btn => btn.addEventListener('click', event => { event.stopPropagation(); const t = getTransaction(btn.dataset.editTransaction); if (t) openForm(t.kind, t); }));
+     document.querySelectorAll('[data-open-finance-for]').forEach(btn => btn.addEventListener('click', event => { event.stopPropagation(); const [bookingId, type] = btn.dataset.openFinanceFor.split(':'); openForm(type, null, { bookingId }); }));
+     document.querySelectorAll('[data-view-task]').forEach(row => row.addEventListener('click', event => { if (!event.target.closest('button')) openDetail('tasks', row.dataset.viewTask); }));
+     document.querySelectorAll('[data-view-shopping]').forEach(row => row.addEventListener('click', event => { if (!event.target.closest('button')) openDetail('shopping', row.dataset.viewShopping); }));
++    document.querySelectorAll('[data-view-idea]').forEach(row => row.addEventListener('click', event => { if (!event.target.closest('button')) openDetail('ideas', row.dataset.viewIdea); }));
+     document.querySelectorAll('[data-view-booking]').forEach(row => row.addEventListener('click', event => { if (!event.target.closest('button') || event.currentTarget.tagName === 'BUTTON') openDetail('bookings', row.dataset.viewBooking); }));
+     document.querySelectorAll('[data-view-transaction]').forEach(row => row.addEventListener('click', event => { if (!event.target.closest('button')) openDetail('transactions', row.dataset.viewTransaction); }));
+ 
+@@ -1204,6 +1253,19 @@
+       showToast('Добавлено в покупки');
+       await refreshData();
+     }));
++
++    const quickIdeaForm = document.getElementById('quickIdeaForm');
++    if (quickIdeaForm) quickIdeaForm.addEventListener('submit', event => safeAction(async () => {
++      event.preventDefault();
++      const fd = new FormData(quickIdeaForm);
++      const title = String(fd.get('title') || '').trim();
++      if (!title) return;
++      const now = new Date().toISOString();
++      await putShared('ideas', { id: uid('idea'), title, createdAt: now, updatedAt: now, updatedBy: currentUser() });
++      quickIdeaForm.reset();
++      showToast('Идея в кубышке');
++      await refreshData();
++    }));
+   }
+ 
+   async function toggleTask(id) {
+@@ -1502,7 +1564,7 @@
+ 
+   window.DachaApp = {
+     openAction(action) {
+-      const formMap = { task: 'task', income: 'income', expense: 'expense', book

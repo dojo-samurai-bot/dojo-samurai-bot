@@ -1,0 +1,177 @@
+name: Build Dacha Fibonacci v0.7.0 clean
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct v0.7.0 Room source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat v061-source/part-{00,01,02,03} > v061.tar.xz.b64
+          test "$(wc -c < v061.tar.xz.b64)" -eq 70924
+          base64 -d v061.tar.xz.b64 > v061.tar.xz
+          echo "303dab18c9c2989fe64a558af4131499c642a8141a8ee2451558a52b0a49169e  v061.tar.xz" | sha256sum -c -
+          tar -xJf v061.tar.xz
+
+          cat v070-sync-patch-b64/part-{00,01,02} > sync.xz.b64
+          test "$(wc -c < sync.xz.b64)" -eq 27596
+          base64 -d sync.xz.b64 > sync.xz
+          echo "4096e2e69c64d22afc1b5ee99e940ce454cf62d49032dbe9b7e2110813e71a40  sync.xz" | sha256sum -c -
+          xz -dc sync.xz > sync.patch
+          echo "746f2c2174d9120cdb3bacef6f4f7dd850ce79e82b7f7b0f8512563295efe3e1  sync.patch" | sha256sum -c -
+
+          cp -a dacha-v061-project dacha-v070-project
+          cd dacha-v070-project
+          git init -q
+          git add .
+          git -c user.email=ci@dachafibonacci.local -c user.name=CI commit -qm baseline
+          git apply ../sync.patch
+          git add .
+          git -c user.email=ci@dachafibonacci.local -c user.name=CI commit -qm sync
+          cd ..
+
+          cat v070-room-patch-safe/part-{00,01,02,03} > room.xz.b64
+          test "$(wc -c < room.xz.b64)" -eq 12464
+          echo "474e98e6e6c7f3200c5c4eb2016ed608b917f0f296a8ba59a2a66a1badcdab25  room.xz.b64" | sha256sum -c -
+          base64 -d room.xz.b64 > room.xz
+          echo "33bf27a005102f8b02ebe013b1897152cdb683c3cb6470810db33f04a09ab197  room.xz" | sha256sum -c -
+          xz -dc room.xz > room.patch
+          echo "6f163e13e26e60d74336a8cc76da0e72bef1d7aaaa798af29fde1aed8570108d  room.patch" | sha256sum -c -
+          cd dacha-v070-project
+          git apply ../room.patch
+          sed -i 's/^android.useAndroidX=false$/android.useAndroidX=true/' gradle.properties
+          grep -Fxq 'android.useAndroidX=true' gradle.properties
+          mkdir -p app/schemas
+          cd ..
+
+          cat v070-server-b64/part-{00,01} > server.tar.xz.b64
+          test "$(wc -c < server.tar.xz.b64)" -eq 13432
+          base64 -d server.tar.xz.b64 > server.tar.xz
+          echo "3dfe9da01832fb5aa2e1b28b05b98d9912f202d9e93a70f53c942c9db0d387ef  server.tar.xz" | sha256sum -c -
+          tar -xJf server.tar.xz
+
+      - name: Validate Room source and sync protocol
+        shell: bash
+        run: |
+          set -euo pipefail
+          R=dacha-v070-project
+          W=$R/app/src/main/assets/www
+          J=$R/app/src/main/java/ru/dachafibonacci/manager
+          D=$J/data
+          node --check "$W/app.js"
+          node --check "$W/db.js"
+          node --check "$W/sync.js"
+          cp server/apps-script/Code.gs /tmp/Code.js && node --check /tmp/Code.js
+          node server/tests/sync-server.test.js server/apps-script/Code.gs
+          grep -Fq "versionName '0.7.0'" "$R/app/build.gradle"
+          grep -Fq 'androidx.room:room-runtime' "$R/app/build.gradle"
+          grep -Fq 'androidx.room:room-compiler' "$R/app/build.gradle"
+          grep -Fxq 'android.useAndroidX=true' "$R/gradle.properties"
+          test -s "$D/DachaDatabase.java"
+          test -s "$D/RoomStore.java"
+          test -s "$D/NativeDatabaseBridge.java"
+          test -s "$D/WidgetSnapshotRepository.java"
+          grep -Fq 'supportsRoomDatabase' "$J/WidgetBridge.java"
+          grep -Fq 'importIndexedDbSnapshot' "$D/RoomStore.java"
+          grep -Fq 'verifyCountsAndIds' "$D/RoomStore.java"
+          grep -Fq 'backendStatus' "$W/db.js"
+          grep -Fq 'WidgetSnapshotRepository.refreshAsync' "$J/BootReceiver.java"
+          grep -Fq 'WidgetSnapshotRepository.refreshAsync' "$J/DachaWidgetProvider.java"
+          grep -Fq 'WidgetSnapshotRepository.refreshAsync' "$J/DachaTodayWidgetProvider.java"
+          ! grep -R -E 'createSyncFile|selectSyncFile|readSyncFile|writeSyncFile|disconnectSyncFile|SYNC_URI_KEY' "$R/app/src/main"
+          python3 - <<'PY'
+          from pathlib import Path
+          r=Path('dacha-v070-project')
+          a=(r/'app/src/main/assets/www/app.js').read_text()
+          assert 'ideas' not in a[a.index('function buildWidgetSnapshot()'):a.index('function syncAndroidWidget()')]
+          w=(r/'app/src/main/java/ru/dachafibonacci/manager/data/WidgetSnapshotRepository.java').read_text()
+          assert 'getAll("ideas")' not in w
+          assert all(x in w for x in ('getAll("tasks")','getAll("shopping")','getAll("bookings")'))
+          d=(r/'app/src/main/assets/www/db.js').read_text()
+          assert all(x in d for x in ('importSnapshot','replaceUserData','backendStatus'))
+          print('Room validation passed')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+
+      - name: Compile Room and build APKs
+        shell: bash
+        working-directory: dacha-v070-project
+        run: |
+          set -o pipefail
+          if ! gradle :app:assembleDebug :app:assembleRelease --stacktrace --no-daemon > ../v070-gradle.log 2>&1; then
+            echo '--- compiler diagnostics ---'
+            grep -n -E -A8 -B3 'error:|FAILURE:|What went wrong:|Caused by:' ../v070-gradle.log | tail -180 || true
+            exit 1
+          fi
+          tail -40 ../v070-gradle.log
+
+      - name: Validate APK and Room schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEBUG=dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
+          RELEASE=dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          ZIPALIGN="$ANDROID_HOME/build-tools/36.0.0/zipalign"
+          test -s "$DEBUG" && test -s "$RELEASE"
+          "$AAPT" dump badging "$DEBUG" > v070-badging.txt
+          "$ZIPALIGN" -c -p -v 4 "$RELEASE" > v070-release-alignment.txt
+          unzip -l "$DEBUG" > v070-apk-listing.txt
+          grep -Fq "package: name='ru.dachafibonacci.manager'" v070-badging.txt
+          grep -Fq "versionCode='10'" v070-badging.txt
+          grep -Fq "versionName='0.7.0'" v070-badging.txt
+          grep -Fq 'assets/www/sync.js' v070-apk-listing.txt
+          grep -Fq 'Verification successful' v070-release-alignment.txt
+          SCHEMA=$(find dacha-v070-project/app/schemas -type f -name '1.json' -print -quit)
+          test -n "$SCHEMA"
+          grep -Fq 'store_records' "$SCHEMA"
+          grep -Fq 'room_meta' "$SCHEMA"
+          tar --exclude='.git' --exclude='.gradle' --exclude='*/build' -cJf dacha-v070-editable-source.tar.xz dacha-v070-project server/apps-script server/tests
+          sha256sum "$DEBUG" "$RELEASE" "$SCHEMA" dacha-v070-editable-source.tar.xz > v070-sha256.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dacha-fibonacci-v070-room-development
+          path: |
+            dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
+            dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
+            dacha-v070-project/app/schemas/
+            dacha-v070-editable-source.tar.xz
+            v070-gradle.log
+            v070-sha256.txt
+            v070-badging.txt
+            v070-release-alignment.txt
+            v070-apk-listing.txt
+            server/apps-script/
+            server/tests/
+          if-no-files-found: warn
+          retention-days: 7
