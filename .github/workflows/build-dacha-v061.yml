@@ -107,14 +107,14 @@ jobs:
           cp "$ANDROID_HOME/build-tools/36.0.0/lib64/libc++.so" v061-signing-tools/lib64/libc++.so
           chmod +x v061-signing-tools/apksigner v061-signing-tools/zipalign
 
-      - name: Upload build artifact
+      - name: Upload source bootstrap artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dacha-fibonacci-v061-apks
+          name: dacha-fibonacci-v061-source-bootstrap
           path: |
-            dacha-v061-project/app/build/outputs/apk/debug/app-debug.apk
-            dacha-v061-project/app/build/outputs/apk/release/app-release-unsigned.apk
+            dacha-v061-project/
+            dacha-v061-final.tar.xz
             v061-build-report.txt
             v061-badging.txt
             v061-permissions.txt
@@ -123,4 +123,4 @@ jobs:
             v061-apk-listing.txt
             v061-signing-tools/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 3

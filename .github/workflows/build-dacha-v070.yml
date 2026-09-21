@@ -1,0 +1,136 @@
+name: Build Dacha Fibonacci v0.7.0
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Reconstruct v0.7.0 source from v0.6.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat v061-source/part-00 v061-source/part-01 v061-source/part-02 v061-source/part-03 > dacha-v061-final.tar.xz.b64
+          test "$(wc -c < dacha-v061-final.tar.xz.b64)" -eq 70924
+          base64 --decode dacha-v061-final.tar.xz.b64 > dacha-v061-final.tar.xz
+          echo "303dab18c9c2989fe64a558af4131499c642a8141a8ee2451558a52b0a49169e  dacha-v061-final.tar.xz" | sha256sum -c -
+          tar -xJf dacha-v061-final.tar.xz
+
+          cat v070-source/part-00 v070-source/part-01 v070-source/part-02 v070-source/part-03 v070-source/part-04 v070-source/part-05 > v070-overlay-and-server.tar.xz.b64
+          test "$(wc -c < v070-overlay-and-server.tar.xz.b64)" -eq 48968
+          base64 --decode v070-overlay-and-server.tar.xz.b64 > v070-overlay-and-server.tar.xz
+          echo "84b3a12498847ca4c268e2627191f015ffbc7d5310f1c0e868ea6fb9e45f4594  v070-overlay-and-server.tar.xz" | sha256sum -c -
+          tar -tJf v070-overlay-and-server.tar.xz
+          tar -xJf v070-overlay-and-server.tar.xz
+
+          cp -a dacha-v061-project dacha-v070-project
+          cp -a v070-overlay/. dacha-v070-project/
+
+      - name: Validate source and migration compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check dacha-v070-project/app/src/main/assets/www/app.js
+          node --check dacha-v070-project/app/src/main/assets/www/db.js
+          cp server/apps-script/Code.gs /tmp/dacha-fibonacci-code.js
+          node --check /tmp/dacha-fibonacci-code.js
+          grep -Fq "versionName '0.7.0'" dacha-v070-project/app/build.gradle
+          grep -Fq "versionCode 10" dacha-v070-project/app/build.gradle
+          grep -Fq "applicationId 'ru.dachafibonacci.manager'" dacha-v070-project/app/build.gradle
+          grep -Fq "const DB_VERSION = 2" dacha-v070-project/app/src/main/assets/www/db.js
+          grep -Fq "[1, 2].includes(Number(payload.version))" dacha-v070-project/app/src/main/assets/www/db.js
+          grep -Fq "Кубышка идей" dacha-v070-project/app/src/main/assets/www/app.js
+          grep -Fq "id=\"quickIdeaForm\"" dacha-v070-project/app/src/main/assets/www/app.js
+          python3 - <<'PY'
+          from pathlib import Path
+          app = Path('dacha-v070-project/app/src/main/assets/www/app.js').read_text()
+          start = app.index('function buildWidgetSnapshot()')
+          end = app.index('function syncAndroidWidget()', start)
+          snapshot = app[start:end]
+          assert 'ideas' not in snapshot, 'Ideas must not be included in Android widget snapshot'
+          assert "['tasks', 'shopping', 'bookings', 'transactions', 'ideas', 'settings']" in app
+          print('v0.7 source assertions passed')
+          PY
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses >/dev/null || true
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+
+      - name: Build APKs
+        working-directory: dacha-v070-project
+        run: gradle :app:assembleDebug :app:assembleRelease --stacktrace --no-daemon
+
+      - name: Validate APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEBUG_APK="dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk"
+          RELEASE_APK="dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          ZIPALIGN="$ANDROID_HOME/build-tools/36.0.0/zipalign"
+          test -s "$DEBUG_APK"
+          test -s "$RELEASE_APK"
+          "$AAPT" dump badging "$DEBUG_APK" > v070-badging.txt
+          "$AAPT" dump permissions "$DEBUG_APK" > v070-permissions.txt
+          "$ZIPALIGN" -c -p -v 4 "$RELEASE_APK" > v070-release-alignment.txt
+          unzip -l "$DEBUG_APK" > v070-apk-listing.txt
+          grep -Fq "package: name='ru.dachafibonacci.manager'" v070-badging.txt
+          grep -Fq "versionCode='10'" v070-badging.txt
+          grep -Fq "versionName='0.7.0'" v070-badging.txt
+          grep -Fq "assets/www/app.js" v070-apk-listing.txt
+          grep -Fq "assets/www/db.js" v070-apk-listing.txt
+          grep -Fq "Verification successful" v070-release-alignment.txt
+          {
+            echo "Dacha Fibonacci v0.7.0 development build report"
+            date -u +"UTC build time: %Y-%m-%dT%H:%M:%SZ"
+            sha256sum "$DEBUG_APK" "$RELEASE_APK"
+            echo
+            cat v070-badging.txt
+            echo
+            cat v070-permissions.txt
+            echo
+            cat v070-release-alignment.txt
+          } > v070-build-report.txt
+
+      - name: Upload development artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dacha-fibonacci-v070-development
+          path: |
+            dacha-v070-project/app/build/outputs/apk/debug/app-debug.apk
+            dacha-v070-project/app/build/outputs/apk/release/app-release-unsigned.apk
+            v070-build-report.txt
+            v070-badging.txt
+            v070-permissions.txt
+            v070-release-alignment.txt
+            v070-apk-listing.txt
+          if-no-files-found: error
+          retention-days: 7
